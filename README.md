@@ -10,7 +10,7 @@ Design decisions agreed with Miku (Sept 2026):
 
 - **Web only.** Vite + React SVG isometric renderer. No 3D engine.
 - **Hybrid feel.** Charming miniature places, but governed by legible, deterministic puzzle rules.
-- **Scoring is rule-based; inhabitants are the payoff.** Each level defines explicit weighted checks (e.g. "windows on two different sides", "the path changes direction"). Score = weighted ratio of checks passed. Tiny inhabitants wander the room and gravitate toward the cells the pattern marks as *attractors*; when they arrive they become "content" (music note). They never affect score.
+- **Scoring is rule-based; inhabitants are the payoff.** Each level defines explicit weighted checks (e.g. "windows on two different sides", "the path changes direction"). Score = weighted ratio of checks passed. Light on Two Sides requires both supplied seats to rest in overlapping light before it can reach 100%. Tiny inhabitants wander the room and gravitate toward the cells the pattern marks as *attractors*; when they arrive they become "content" (music note). They never affect score.
 - **Handful of quality levels first.** Five building-scale patterns are playable (159 Light on Two Sides of Every Room, 112 Entrance Transition, 180 Window Place, 179 Alcoves, 185 Sitting Circle). All 253 patterns are shown on the home page; unbuilt ones are locked. The data model (`Level`) is generic so more can be added as pure data + an `evaluate` function.
 
 ### Structure
