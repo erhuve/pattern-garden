@@ -2,7 +2,34 @@ This file provides guidance when working with code in this repository. The READM
 
 # Project Notes
 
-<!-- Documentation for this specific project goes here. This will include both an articulation of what this project aims to accomplish as well as technical details about how it works. This means explaining the purpose of the project as a whole along with an overview of the design choices. -->
+## Pattern Garden
+
+A browser puzzle game built on Christopher Alexander's *A Pattern Language* (1977). Every level is one of the book's 253 patterns. The player is given a small isometric room (or plot) and a limited palette of pieces — windows, doors, alcoves, seats, tables, plants, trees, path stones, gates, hearths — and arranges them until the pattern is "fulfilled" at 100%.
+
+Design decisions agreed with Miku (Sept 2026):
+
+- **Web only.** Vite + React SVG isometric renderer. No 3D engine.
+- **Hybrid feel.** Charming miniature places, but governed by legible, deterministic puzzle rules.
+- **Scoring is rule-based; inhabitants are the payoff.** Each level defines explicit weighted checks (e.g. "windows on two different sides", "the path changes direction"). Score = weighted ratio of checks passed. Tiny inhabitants wander the room and gravitate toward the cells the pattern marks as *attractors*; when they arrive they become "content" (music note). They never affect score.
+- **Handful of quality levels first.** Five building-scale patterns are playable (159 Light on Two Sides of Every Room, 112 Entrance Transition, 180 Window Place, 179 Alcoves, 185 Sitting Circle). All 253 patterns are shown on the home page; unbuilt ones are locked. The data model (`Level`) is generic so more can be added as pure data + an `evaluate` function.
+
+### Structure
+
+- `src/data/apl.json` — all 253 patterns (number, title, section, subsection, stars) plus the 1858 cross-reference edges. Derived from BeksOmega/pattern-language-graph GraphML; two duplicate numbers in the source (73→75 The Family, 201→211 Thickening the Outer Walls) were corrected by hand.
+- `src/game/types.ts` — `Piece` (wall pieces live on a room side+pos; cell pieces live on a grid cell), `Layout`, `Level`, `Check`.
+- `src/game/levels.ts` — the five levels, each with `problem` / `therefore` text (paraphrased from the book), a palette with max counts, and an `evaluate(layout)` returning checks + attractor cells. `evaluate(level, layout)` computes the 0–100 score.
+- `src/game/geometry.ts` — grid helpers, `placeAt` / `removeAt` with placement rules (indoor vs outdoor pieces, wall vs floor, occupancy).
+- `src/game/inhabitants.ts` — spawn / retarget / step for the little people. Blocking furniture is not walkable.
+- `src/game/Board.tsx` — SVG isometric renderer. Back walls full height, front walls knee-high so the interior stays visible. Hit targets carry `data-cell="x,y"` and `data-wall="<side><pos>"` for testing.
+- `src/game/progress.ts` — localStorage best score + last layout per level (`pattern-garden:v1`).
+- `src/pages/home.tsx` — level list and the full 253-pattern index by section.
+- `src/pages/play.tsx` — the play screen: board, palette, score ring, checklist, book excerpt, celebration + next.
+- Styling is hand-written CSS under the `pg-` prefix at the bottom of `src/styles.css`; fonts are Fraunces + IBM Plex Mono loaded from `index.html`.
+
+### Adding a level
+
+Add a `Level` object to `src/game/levels.ts` and include it in `LEVELS`. Checks should each carry a plain-language `detail` for both the pass and fail state, and the level must be solvable to exactly 100% with its palette — verify with a quick script that calls `evaluate` on a known-good layout.
+
 
 ---
 
