@@ -21,6 +21,7 @@ Design decisions agreed with Miku (Sept 2026):
 - `src/game/geometry.ts` — grid helpers, `placeAt` / `removeAt` with placement rules (indoor vs outdoor pieces, wall vs floor, occupancy). Alcoves extend the room by one usable recessed floor cell; attached furniture is removed with the alcove.
 - `src/game/inhabitants.ts` — spawn / retarget / step for the little people. Blocking furniture is not walkable.
 - `src/game/Board.tsx` — SVG isometric renderer. Back walls full height, front walls knee-high so the interior stays visible. Hit targets carry `data-cell="x,y"` and `data-wall="<side><pos>"` for testing.
+- `src/game/CompletionCelebration.tsx` + `completion-celebration.css` — transient, non-blocking board celebration on completion, with reduced-motion support.
 - `src/game/progress.ts` — versioned localStorage best score + last layout per level (`pattern-garden:v1`), including one-time layout migrations.
 - `src/pages/home.tsx` — level list and the full 253-pattern index by section.
 - `src/pages/play.tsx` — the play screen: board, palette, score ring, checklist, book excerpt, celebration + next.
@@ -42,7 +43,7 @@ This is a **Zo Site** - a web application running on a user's Zo computer that c
 
 ## Play-screen layout
 
-The play screen uses a viewport-height workbench. Desktop has a resizable board with a horizontal piece tray below it and a dedicated criteria column; the score sits in the header. Phone layouts use a compact two-row tray and two-column checklist. Select a criterion for its current explanation (inline on desktop, a native modal sheet on phones and short screens). Completion appears beside the criteria rather than covering the board. About preserves the book context and previous/next navigation on mobile.
+The play screen uses a viewport-height workbench. Desktop has a resizable board with a horizontal piece tray below it and a dedicated criteria column; the score sits in the header. Phone layouts use a compact two-row tray and two-column checklist. Select a criterion for its current explanation (inline on desktop, a native modal sheet on phones and short screens). A newly completed pattern plays a 3.6-second celebration centered over the board (warm ripple, drifting petals and a clear 100% message), then fades; the persistent success summary stays beside the criteria. The overlay never captures input or moves focus. Reduced-motion mode shows the same message without animation. Only a current-score transition from incomplete to 100% triggers it: saved completed layouts and ordinary rerenders do not replay it, and resetting, navigating or dropping below 100% clears it. Completing the pattern again plays a fresh celebration. About preserves the book context and previous/next navigation on mobile.
 
 `src/pages/play-layout.css` scopes layout overrides to the play screen. Do not reduce touch targets below 44px or clip criteria to enforce a fixed height. At 320px widths, very short viewports, or enlarged text, scrolling is an intentional accessibility fallback. Keyed `PlayLevel` instances prevent route changes from recording the previous level's pieces under the next level.
 
@@ -53,6 +54,7 @@ bun test src/game
 bunx tsc --noEmit
 bun run build
 python3 tests/play_layout.py --build-dir dist
+python3 tests/completion_celebration.py --build-dir dist
 ```
 
 The browser suite requires Python Playwright and Chromium (`python3 -m pip install playwright` and `python3 -m playwright install chromium`). `--build-dir` tests an isolated build through intercepted browser requests without a server; `--base-url` tests a running deployment in a fresh browser profile. `--screenshots <directory>` saves desktop, phone, landscape and completion evidence. The suite checks all five levels across ten viewport sizes, text/320px fallbacks, modal focus, actual touch placement/removal, score persistence and level navigation.

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ArrowRight, X } from "lucide-react";
 import { Board, type Target } from "@/game/Board";
+import { CompletionCelebration } from "@/game/CompletionCelebration";
 import { CriteriaPanel, PieceTray, PlayDialog } from "@/game/PlayControls";
 import { LEVELS, evaluate } from "@/game/levels";
 import type { Layout, Piece, PieceKind } from "@/game/types";
@@ -135,6 +136,7 @@ function PlayLevel({ idx }: { idx: number }) {
       <div className="pg-play-grid">
         <section className="pg-stage" aria-label="Building board">
           <Board level={level} layout={layout} evaluation={evaluation} people={people} tool={tool} onTarget={handleTarget} showLight={showLight} />
+          <CompletionCelebration complete={score === 100} />
           {message && (
             <div className="pg-toast" role="status">
               {message}
