@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import type { Cell, Evaluation, Layout, Level, PieceKind, Side, WallPiece } from "./types";
-import { interiorCell, wallLength } from "./geometry";
+import { alcoveAt, interiorCell, wallLength } from "./geometry";
 import { lightCount } from "./levels";
 import type { Inhabitant } from "./inhabitants";
 
@@ -170,7 +170,8 @@ export function Board({ level, layout, evaluation, people, tool, onTarget, showL
   const ground: React.ReactNode[] = [];
   for (let y = 0; y < world.h; y++)
     for (let x = 0; x < world.w; x++) {
-      const inside = x >= room.x && x < room.x + room.w && y >= room.y && y < room.y + room.h;
+      const insideRoom = x >= room.x && x < room.x + room.w && y >= room.y && y < room.y + room.h;
+      const inside = insideRoom || Boolean(alcoveAt(room, layout.pieces, { x, y }));
       const lit = inside && showLight ? lightCount(layout, { x, y }) : 0;
       const isA = attract.has(`${x},${y}`);
       const unhappy = unhappySeats.has(`${x},${y}`);
@@ -273,7 +274,7 @@ export function Board({ level, layout, evaluation, people, tool, onTarget, showL
 
 function AlcoveBay({ seg, h, shade }: { seg: WallSeg; h: number; shade: string }) {
   const o = outward(seg.side);
-  const d = iso(o.x * 0.7, o.y * 0.7);
+  const d = iso(o.x, o.y);
   const shift = (p: P, z = 0): P => ({ x: p.x + d.x, y: p.y + d.y - z });
   const a2 = shift(seg.a);
   const b2 = shift(seg.b);

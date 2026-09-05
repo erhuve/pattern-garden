@@ -32,6 +32,10 @@ export function exteriorCell(room: Rect, wall: { side: Side; pos: number }): Cel
   }
 }
 
+export function alcoveCell(room: Rect, wall: { side: Side; pos: number }): Cell {
+  return exteriorCell(room, wall);
+}
+
 export function inRoom(room: Rect, c: Cell): boolean {
   return c.x >= room.x && c.x < room.x + room.w && c.y >= room.y && c.y < room.y + room.h;
 }
@@ -66,6 +70,13 @@ export function pieceAt(layout: Layout, c: Cell): CellPiece | undefined {
 
 export function wallAt(layout: Layout, side: Side, pos: number): WallPiece | undefined {
   return wallPieces(layout).find((p) => p.side === side && p.pos === pos);
+}
+
+export function alcoveAt(room: Rect, pieces: Piece[], c: Cell): WallPiece | undefined {
+  return pieces.find(
+    (piece): piece is WallPiece =>
+      isWallPiece(piece) && piece.kind === "alcove" && sameCell(alcoveCell(room, piece), c),
+  );
 }
 
 export function samePiece(a: Piece, b: Piece): boolean {
@@ -146,7 +157,7 @@ export function placeAt(level: Level, pieces: Piece[], kind: PieceKind, t: Place
   if (isWallKind(kind)) return "That piece belongs on a wall.";
   const c = { x: t.x, y: t.y };
   if (!inWorld(level.world, c)) return "Off the edge of the world.";
-  const inside = inRoom(level.room, c);
+  const inside = inRoom(level.room, c) || Boolean(alcoveAt(level.room, pieces, c));
   if (OUTDOOR_KINDS.has(kind) && inside) return `A ${kind} belongs outside the room.`;
   if (INDOOR_KINDS.has(kind) && !inside) return `A ${kind} belongs inside the room.`;
   const existing = pieces.find((p) => isCellPiece(p) && p.x === c.x && p.y === c.y);
@@ -154,9 +165,34 @@ export function placeAt(level: Level, pieces: Piece[], kind: PieceKind, t: Place
   return [...pieces, { kind, x: c.x, y: c.y } as CellPiece];
 }
 
-export function removeAt(pieces: Piece[], t: PlaceTarget): Piece[] {
-  if (t.type === "wall") return pieces.filter((p) => !(isWallPiece(p) && p.side === t.side && p.pos === t.pos));
+export function removeAt(level: Level, pieces: Piece[], t: PlaceTarget): Piece[] {
+  if (t.type === "wall") {
+    const wall = pieces.find((piece) => isWallPiece(piece) && piece.side === t.side && piece.pos === t.pos);
+    const attachedCell = wall?.kind === "alcove" ? alcoveCell(level.room, wall) : null;
+    return pieces.filter(
+      (piece) =>
+        !(isWallPiece(piece) && piece.side === t.side && piece.pos === t.pos) &&
+        !(attachedCell && isCellPiece(piece) && sameCell(piece, attachedCell)),
+    );
+  }
   return pieces.filter((p) => !(isCellPiece(p) && p.x === t.x && p.y === t.y));
+}
+
+export function migrateLegacyAlcoveSeats(level: Level, pieces: Piece[]): Piece[] {
+  const migrated = [...pieces];
+  const alcoves = migrated.filter(
+    (piece): piece is WallPiece => isWallPiece(piece) && piece.kind === "alcove",
+  );
+  for (const alcove of alcoves) {
+    const destination = alcoveCell(level.room, alcove);
+    if (migrated.some((piece) => isCellPiece(piece) && sameCell(piece, destination))) continue;
+    const source = interiorCell(level.room, alcove);
+    const seatIndex = migrated.findIndex(
+      (piece) => isCellPiece(piece) && piece.kind === "seat" && sameCell(piece, source),
+    );
+    if (seatIndex >= 0) migrated[seatIndex] = { kind: "seat", ...destination };
+  }
+  return migrated;
 }
 
 function isWallKind(kind: PieceKind): kind is WallPieceKind {

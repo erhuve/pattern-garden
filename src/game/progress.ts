@@ -1,9 +1,13 @@
 import { useEffect, useState } from "react";
 import type { Layout, Piece } from "./types";
+import { levelBySlug } from "./levels";
+import { migrateLegacyAlcoveSeats } from "./geometry";
 
 const KEY = "pattern-garden:v1";
+const VERSION = 2;
 
 type Saved = {
+  version: number;
   best: Record<string, number>;
   layouts: Record<string, Piece[]>;
 };
@@ -11,11 +15,16 @@ type Saved = {
 function load(): Saved {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return { best: {}, layouts: {} };
+    if (!raw) return { version: VERSION, best: {}, layouts: {} };
     const parsed = JSON.parse(raw) as Partial<Saved>;
-    return { best: parsed.best ?? {}, layouts: parsed.layouts ?? {} };
+    const layouts = parsed.layouts ?? {};
+    if ((parsed.version ?? 1) < VERSION && layouts.alcoves) {
+      const level = levelBySlug("alcoves");
+      if (level) layouts.alcoves = migrateLegacyAlcoveSeats(level, layouts.alcoves);
+    }
+    return { version: VERSION, best: parsed.best ?? {}, layouts };
   } catch {
-    return { best: {}, layouts: {} };
+    return { version: VERSION, best: {}, layouts: {} };
   }
 }
 
@@ -35,6 +44,7 @@ export function useProgress() {
     layoutFor: (slug: string): Piece[] | undefined => state.layouts[slug],
     record(slug: string, score: number, layout: Layout) {
       setState((s) => ({
+        version: VERSION,
         best: { ...s.best, [slug]: Math.max(s.best[slug] ?? 0, score) },
         layouts: { ...s.layouts, [slug]: layout.pieces },
       }));

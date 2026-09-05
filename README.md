@@ -18,10 +18,10 @@ Design decisions agreed with Miku (Sept 2026):
 - `src/data/apl.json` — all 253 patterns (number, title, section, subsection, stars) plus the 1858 cross-reference edges. Derived from BeksOmega/pattern-language-graph GraphML; two duplicate numbers in the source (73→75 The Family, 201→211 Thickening the Outer Walls) were corrected by hand.
 - `src/game/types.ts` — `Piece` (wall pieces live on a room side+pos; cell pieces live on a grid cell), `Layout`, `Level`, `Check`.
 - `src/game/levels.ts` — the five levels, each with `problem` / `therefore` text (paraphrased from the book), a palette with max counts, and an `evaluate(layout)` returning checks + attractor cells. `evaluate(level, layout)` computes the 0–100 score.
-- `src/game/geometry.ts` — grid helpers, `placeAt` / `removeAt` with placement rules (indoor vs outdoor pieces, wall vs floor, occupancy).
+- `src/game/geometry.ts` — grid helpers, `placeAt` / `removeAt` with placement rules (indoor vs outdoor pieces, wall vs floor, occupancy). Alcoves extend the room by one usable recessed floor cell; attached furniture is removed with the alcove.
 - `src/game/inhabitants.ts` — spawn / retarget / step for the little people. Blocking furniture is not walkable.
 - `src/game/Board.tsx` — SVG isometric renderer. Back walls full height, front walls knee-high so the interior stays visible. Hit targets carry `data-cell="x,y"` and `data-wall="<side><pos>"` for testing.
-- `src/game/progress.ts` — localStorage best score + last layout per level (`pattern-garden:v1`).
+- `src/game/progress.ts` — versioned localStorage best score + last layout per level (`pattern-garden:v1`), including one-time layout migrations.
 - `src/pages/home.tsx` — level list and the full 253-pattern index by section.
 - `src/pages/play.tsx` — the play screen: board, palette, score ring, checklist, book excerpt, celebration + next.
 - Styling is hand-written CSS under the `pg-` prefix at the bottom of `src/styles.css`; fonts are Fraunces + IBM Plex Mono loaded from `index.html`.

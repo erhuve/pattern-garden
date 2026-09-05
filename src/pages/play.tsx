@@ -93,7 +93,7 @@ export default function Play() {
     setMessage(null);
     if (!tool) return;
     if (tool === "erase") {
-      setPieces((ps) => removeAt(ps, t));
+      setPieces((ps) => removeAt(level, ps, t));
       return;
     }
     const entry = level.palette.find((p) => p.kind === tool);

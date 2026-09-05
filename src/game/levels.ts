@@ -1,6 +1,7 @@
 import type { Cell, CheckResult, Evaluation, Layout, Level, Rect, Side, WallPiece } from "./types";
 import {
   cellPieces,
+  alcoveCell,
   chebyshev,
   connectedPath,
   distinctSides,
@@ -213,9 +214,9 @@ const alcoves: Level = {
     const alcs = wallPieces(layout).filter((p) => p.kind === "alcove");
     const seats = cellPieces(layout).filter((p) => p.kind === "seat");
     const table = cellPieces(layout).find((p) => p.kind === "table");
-    const furnished = alcs.filter((a) => seats.some((s) => sameCell(s, interiorCell(room, a))));
+    const furnished = alcs.filter((a) => seats.some((s) => sameCell(s, alcoveCell(room, a))));
     const separated = alcs.every((a, i) =>
-      alcs.every((b, j) => i === j || manhattan(interiorCell(room, a), interiorCell(room, b)) >= 2),
+      alcs.every((b, j) => i === j || manhattan(alcoveCell(room, a), alcoveCell(room, b)) >= 2),
     );
     const nearTable = table ? furnished.filter((a) => manhattan(interiorCell(room, a), table) <= 3).length : 0;
     const lit = alcs.filter((a) => lightCount(layout, interiorCell(room, a)) > 0).length;
@@ -223,12 +224,12 @@ const alcoves: Level = {
       checks: [
         check("common", "A common table to gather at", 10, Boolean(table), table ? "The group has somewhere to be together." : "Keep a table in the middle of the room."),
         check("count", "At least two alcoves", 25, Math.min(1, alcs.length / 2), alcs.length >= 2 ? `${alcs.length} pockets open off the room.` : "Push a bay out of the wall to make a pocket."),
-        check("seated", "Each alcove has a seat", 30, alcs.length === 0 ? 0 : furnished.length / alcs.length, furnished.length === alcs.length && alcs.length > 0 ? "Every pocket invites someone to sit." : "Put a seat in the cell just inside each alcove."),
+        check("seated", "Each alcove has a seat", 30, alcs.length === 0 ? 0 : furnished.length / alcs.length, furnished.length === alcs.length && alcs.length > 0 ? "Every pocket invites someone to sit." : "Put a seat on the recessed floor inside each alcove."),
         check("separate", "Alcoves are distinct from each other", 15, alcs.length >= 2 && separated, separated ? "Each is a little world." : "Two alcoves side by side blur into one wide wall."),
         check("connected", "Still part of the room", 20, alcs.length === 0 ? 0 : nearTable / alcs.length, nearTable === alcs.length && alcs.length > 0 ? "You can be alone and still hear the conversation." : "Alcoves too far from the table feel like separate rooms."),
         check("light", "Alcoves catch the daylight", 0, lit, lit > 0 ? `${lit} alcove${lit === 1 ? "" : "s"} lit — a bonus.` : ""),
       ].filter((c) => c.points > 0),
-      attractors: furnished.map((a) => interiorCell(room, a)),
+      attractors: furnished.map((a) => alcoveCell(room, a)),
     };
   },
 };
