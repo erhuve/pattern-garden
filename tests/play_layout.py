@@ -26,7 +26,7 @@ def local_route(route):
 
 measure = """() => {
   const visible = e => e.getClientRects().length > 0;
-  const targets = [...document.querySelectorAll('.pg-tool,.pg-criterion,.pg-tray-actions button,.pg-play-head button,.pg-back')].filter(visible);
+  const targets = [...document.querySelectorAll('.pg-tool,.pg-criterion,.pg-board-actions button,.pg-play-head button,.pg-back')].filter(visible);
   const rect = e => e.getBoundingClientRect();
   const criteria = document.querySelector('.pg-criteria');
   return {
@@ -35,7 +35,28 @@ measure = """() => {
     tiny: targets.filter(e => rect(e).width<43||rect(e).height<43).map(e=>e.textContent),
     clipped: [...document.querySelectorAll('.pg-tool,.pg-criterion,.pg-play-title')].filter(e => e.scrollWidth>e.clientWidth+2||e.scrollHeight>e.clientHeight+2).map(e=>e.textContent),
     criteriaScroll: criteria.scrollHeight>criteria.clientHeight+1,
-    board: [rect(document.querySelector('.pg-board')).width, rect(document.querySelector('.pg-board')).height]
+    board: [rect(document.querySelector('.pg-board')).width, rect(document.querySelector('.pg-board')).height],
+    rail: (() => {
+      const stage = rect(document.querySelector('.pg-stage'));
+      const viewport = rect(document.querySelector('.pg-board-viewport'));
+      const tiles = [...document.querySelectorAll('.pg-piece-tile')];
+      const controls = [...document.querySelectorAll('.pg-board-palette button,.pg-board-actions button')];
+      const contains = (a,b) => b.left>=a.left && b.top>=a.top && b.right<=a.right && b.bottom<=a.bottom;
+      const intersects = (a,b) => a.left<b.right && a.right>b.left && a.top<b.bottom && a.bottom>b.top;
+      return {
+        trayGone: !document.querySelector('.pg-tray'),
+        inside: controls.every(e => contains(stage,rect(e))),
+        clearBoard: controls.every(e => !intersects(rect(e),viewport)),
+        square: tiles.every(e => Math.abs(rect(e).width-rect(e).height)<1),
+        hittable: controls.every(e => {const r=rect(e);return e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))}),
+        counters: tiles.filter(e=>e.querySelector('.pg-tool-count')).every(e => {
+          const tile=rect(e), count=rect(e.querySelector('.pg-tool-count'));
+          return contains(tile,count) && count.top>tile.top+tile.height/2 && tile.right-count.right<=8 && tile.bottom-count.bottom<=8;
+        }),
+        icons: tiles.every(e=>e.querySelector('svg[aria-hidden=true]')),
+        fullHeight: innerWidth<=760 || Math.abs(stage.bottom-rect(criteria).bottom)<2
+      };
+    })()
   };
 }"""
 
@@ -67,8 +88,10 @@ with sync_playwright() as p:
             assert not result["outside"] and not result["tiny"] and not result["clipped"], (slug, width, height, result)
             assert not result["criteriaScroll"], (slug, width, height, result)
             assert result["board"][1] >= 140, (slug, width, height, result)
-            if slug == "entrance-transition" and (width, height) in [(1440, 900), (390, 700), (844, 390)]:
-                screenshot(f"play-{width}x{height}")
+            assert all(result["rail"].values()), (slug, width, height, result)
+            assert page.locator('.pg-board').evaluate("svg => [...svg.querySelectorAll('[data-cell],[data-wall]')].every(el => {const b=el.getBBox(), p=svg.createSVGPoint();p.x=b.x+b.width/2;p.y=b.y+b.height/2;const q=p.matrixTransform(svg.getScreenCTM());return svg.contains(document.elementFromPoint(q.x,q.y))})"), (slug, width, height, "Board covered")
+            if slug in ["light-on-two-sides", "entrance-transition", "sitting-circle"] and (width, height) in [(1440, 900), (390, 700), (360, 640), (844, 390)]:
+                screenshot(f"{slug}-{width}x{height}")
     print(f"PASS: {len(levels) * len(viewports)} viewport/level combinations without scrolling, clipping or undersized controls")
 
     page.set_viewport_size({"width": 320, "height": 568})
@@ -82,6 +105,26 @@ with sync_playwright() as p:
             expect(page.locator("dialog")).to_be_visible()
             page.get_by_role("button", name="Close explanation").tap()
     print("PASS: 320px fallback preserves readable, reachable criteria")
+
+    page.set_viewport_size({"width": 390, "height": 700})
+    for slug in levels:
+        open_level(slug)
+        initial = page.evaluate("JSON.parse(localStorage.getItem('pattern-garden:v1')).layouts")
+        for tile in page.locator(".pg-piece-tile").all():
+            label = tile.get_attribute("aria-label").split(",")[0]
+            tile.tap()
+            expect(tile).to_have_attribute("aria-pressed", "true")
+            expect(page.locator(".pg-piece-tile[aria-pressed=true]")).to_have_count(1)
+            expect(page.locator(".pg-placement-hint strong")).to_have_text(label)
+            expect(page.locator(".pg-toast")).to_have_count(0)
+            assert page.evaluate("JSON.parse(localStorage.getItem('pattern-garden:v1')).layouts") == initial
+        tile = page.locator(".pg-piece-tile").first
+        tile.focus()
+        page.keyboard.press("Enter")
+        expect(tile).to_have_attribute("aria-pressed", "true")
+        expect(tile).to_be_focused()
+        assert page.evaluate("JSON.parse(localStorage.getItem('pattern-garden:v1')).layouts") == initial
+    print("PASS: all icon tools select by touch and keyboard without placing or erasing through the palette")
 
     page.set_viewport_size({"width": 1280, "height": 720})
     open_level("entrance-transition")
@@ -115,6 +158,8 @@ with sync_playwright() as p:
     open_level("light-on-two-sides")
     assert int(page.locator(".pg-score-value span").inner_text()) < 100
     expect(page.locator(".pg-success")).to_have_count(0)
+    expect(page.get_by_role("button", name="Window,", exact=False).locator(".pg-tool-count")).to_have_text("4/4")
+    expect(page.get_by_role("button", name="Seat,", exact=False).locator(".pg-tool-count")).to_have_text("1/2")
 
     def tap_svg(x, y):
         point = page.locator(".pg-board").evaluate("(svg, point) => {const p=svg.createSVGPoint();p.x=point[0];p.y=point[1];const q=p.matrixTransform(svg.getScreenCTM());return {x:q.x,y:q.y}}", [x, y])
@@ -125,6 +170,7 @@ with sync_playwright() as p:
 
     page.get_by_role("button", name="Seat,", exact=False).tap()
     tap_cell(4, 2)
+    expect(page.get_by_role("button", name="Seat,", exact=False).locator(".pg-tool-count")).to_have_text("2/2")
     expect(page.locator(".pg-score-value span")).to_have_text("100")
     expect(page.locator(".pg-success")).to_contain_text("The pattern is alive")
     assert not page.evaluate(measure)["outside"]
@@ -134,6 +180,8 @@ with sync_playwright() as p:
     page.get_by_role("button", name="Close explanation").tap()
     page.get_by_role("button", name="Remove", exact=True).tap()
     tap_cell(4, 2)
+    expect(page.get_by_role("button", name="Seat,", exact=False).locator(".pg-tool-count")).to_have_text("1/2")
+    assert page.get_by_role("button", name="Window,", exact=False).evaluate("el => getComputedStyle(el).opacity") == "1"
     expect(page.locator(".pg-success")).to_have_count(0)
     assert int(page.locator(".pg-score-value span").inner_text()) < 100
     page.reload()

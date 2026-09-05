@@ -55,8 +55,8 @@
   flex: 1;
   min-height: 0;
   grid-template-columns: minmax(0, 1fr) 302px;
-  grid-template-rows: minmax(220px, 1fr) auto;
-  grid-template-areas: "stage criteria" "tray criteria";
+  grid-template-rows: minmax(220px, 1fr);
+  grid-template-areas: "stage criteria";
   gap: 12px 18px;
   align-items: stretch;
 }
@@ -88,13 +88,6 @@
 .pg-workbench button {
   touch-action: manipulation;
 }
-.pg-tray {
-  grid-area: tray;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
 .pg-section-heading {
   display: flex;
   justify-content: space-between;
@@ -111,45 +104,6 @@
 }
 .pg-section-heading > span {
   white-space: nowrap;
-}
-.pg-tray-pieces {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
-  gap: 6px;
-}
-.pg-tray .pg-tool {
-  min-height: 52px;
-  grid-template-areas: "name count";
-  align-items: center;
-  gap: 4px;
-  padding: 8px 10px;
-}
-.pg-tray .pg-tool-name {
-  font-size: 0.9rem;
-  line-height: 1.15;
-}
-.pg-tray .pg-tool-count {
-  font-size: 0.64rem;
-}
-.pg-tray .pg-tool-erase {
-  grid-template-areas: "icon name";
-  gap: 5px;
-}
-.pg-tray-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-}
-.pg-placement-hint {
-  margin: 0;
-  font-size: 0.8rem;
-  color: var(--pg-ink-2);
-}
-.pg-tray-actions {
-  display: flex;
-  gap: 6px;
 }
 .pg-icon-button {
   display: grid;
@@ -294,13 +248,6 @@
     grid-template-columns: minmax(0, 1fr) 276px;
     gap: 12px;
   }
-  .pg-tray-pieces {
-    grid-auto-flow: row;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-  .pg-placement-hint {
-    max-width: 140px;
-  }
 }
 @media (max-width: 760px) {
   .pg-play.pg-workbench {
@@ -337,55 +284,12 @@
   }
   .pg-workbench .pg-play-grid {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(140px, 1fr) max-content max-content;
-    grid-template-areas: "stage" "tray" "criteria";
+    grid-template-rows: minmax(230px, 1fr) max-content;
+    grid-template-areas: "stage" "criteria";
     gap: 8px;
   }
   .pg-workbench .pg-stage {
     border-radius: 14px;
-  }
-  .pg-tray {
-    gap: 6px;
-  }
-  .pg-tray-pieces {
-    grid-auto-flow: row;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 5px;
-  }
-  .pg-tray-pieces.is-many {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-  .pg-tray-pieces.is-many .pg-tool {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "name" "count";
-    justify-items: center;
-    text-align: center;
-    gap: 2px;
-  }
-  .pg-tray-pieces.is-many .pg-tool-erase {
-    grid-template-areas: "icon" "name";
-    font-size: 0.76rem;
-  }
-  .pg-tray-pieces.is-many .pg-tool {
-    padding: 4px 2px;
-  }
-  .pg-tray .pg-tool {
-    min-height: 44px;
-    padding: 7px 8px;
-    border-radius: 9px;
-  }
-  .pg-tray .pg-tool-name {
-    font-size: 0.85rem;
-  }
-  .pg-tray-footer {
-    gap: 4px;
-  }
-  .pg-placement-hint {
-    font-size: 0.72rem;
-    max-width: 132px;
-  }
-  .pg-tray-actions {
-    gap: 4px;
   }
   .pg-workbench .pg-chip {
     padding: 6px 8px;
@@ -451,9 +355,6 @@
   .pg-play.pg-workbench {
     min-height: 670px;
   }
-  .pg-placement-hint {
-    max-width: 86px;
-  }
 }
 
 @media (min-width: 761px) and (max-height: 600px) {
@@ -467,33 +368,8 @@
   }
   .pg-workbench .pg-play-grid {
     grid-template-columns: minmax(0, 1fr) 310px;
-    grid-template-rows: minmax(140px, 1fr) max-content;
+    grid-template-rows: minmax(230px, 1fr);
     gap: 8px 12px;
-  }
-  .pg-tray-pieces {
-    grid-auto-flow: row;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 5px;
-  }
-  .pg-tray-pieces.is-many {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-  .pg-tray .pg-tool {
-    min-height: 44px;
-    padding: 5px;
-  }
-  .pg-tray .pg-tool-name {
-    font-size: 0.8rem;
-  }
-  .pg-tray {
-    gap: 5px;
-  }
-  .pg-placement-hint {
-    font-size: 0.72rem;
-  }
-  .pg-tray-actions .pg-chip {
-    padding: 5px 8px;
-    font-size: 0.68rem;
   }
   .pg-criteria {
     padding: 10px;

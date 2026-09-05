@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ArrowRight, X } from "lucide-react";
 import { Board, type Target } from "@/game/Board";
 import { CompletionCelebration } from "@/game/CompletionCelebration";
-import { CriteriaPanel, PieceTray, PlayDialog } from "@/game/PlayControls";
+import { BoardTools, CriteriaPanel, PlayDialog } from "@/game/PlayControls";
 import { LEVELS, evaluate } from "@/game/levels";
 import type { Layout, Piece, PieceKind } from "@/game/types";
 import { PIECE_LABELS, WALL_KINDS } from "@/game/types";
@@ -12,6 +12,7 @@ import { retarget, spawn, step, type Inhabitant } from "@/game/inhabitants";
 import { useProgress } from "@/game/progress";
 import { PATTERNS } from "@/game/patterns";
 import "./play-layout.css";
+import "./board-tools.css";
 
 function mulberry(seed: number) {
   let a = seed >>> 0;
@@ -134,9 +135,15 @@ function PlayLevel({ idx }: { idx: number }) {
         </div>
       </header>
       <div className="pg-play-grid">
-        <section className="pg-stage" aria-label="Building board">
-          <Board level={level} layout={layout} evaluation={evaluation} people={people} tool={tool} onTarget={handleTarget} showLight={showLight} />
-          <CompletionCelebration complete={score === 100} />
+        <section className="pg-stage" aria-label="Building board" style={{ ["--piece-total" as string]: level.palette.length + 1 }}>
+          <div className="pg-board-viewport">
+            <Board level={level} layout={layout} evaluation={evaluation} people={people} tool={tool} onTarget={handleTarget} showLight={showLight} />
+            <CompletionCelebration complete={score === 100} />
+          </div>
+          <BoardTools level={level} pieces={pieces} tool={tool} onTool={(kind) => { setTool(kind); setMessage(null); }}
+            showLight={showLight} onLight={() => setShowLight((value) => !value)}
+            onReset={() => { setPieces(level.starting); progress.reset(level.slug); setMessage(null); }}
+            onInfo={() => setDialog({ kind: "about" })} />
           {message && (
             <div className="pg-toast" role="status">
               {message}
@@ -144,10 +151,6 @@ function PlayLevel({ idx }: { idx: number }) {
             </div>
           )}
         </section>
-        <PieceTray level={level} pieces={pieces} tool={tool} onTool={(kind) => { setTool(kind); setMessage(null); }}
-          showLight={showLight} onLight={() => setShowLight((value) => !value)}
-          onReset={() => { setPieces(level.starting); progress.reset(level.slug); setMessage(null); }}
-          onInfo={() => setDialog({ kind: "about" })} />
         <CriteriaPanel evaluation={evaluation} completeLine={level.completeLine}
           onNext={next ? () => navigate(`/play/${next.slug}`) : undefined}
           onExplain={(check) => setDialog({ kind: "check", id: check.id })} />
@@ -161,6 +164,7 @@ function PlayLevel({ idx }: { idx: number }) {
         ) : (
           <>
             <p className="pg-quote">{level.quote}</p>
+            <p>Piece counters show used / available inventory. Extras are optional; the criteria determine when the pattern is complete.</p>
             {pattern && <p className="pg-meta">Pattern {pattern.number} · {pattern.section} · {pattern.subsection}{pattern.stars > 0 && <> · {"★".repeat(pattern.stars)}</>}</p>}
             <nav className="pg-dialog-nav" aria-label="Browse patterns">
               {prev && <Link className="pg-chip" to={`/play/${prev.slug}`}><ArrowLeft />Previous pattern</Link>}

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowRight, Check, ChevronRight, Eraser, Info, Lightbulb, RotateCcw, Sparkles, X } from "lucide-react";
 import type { CheckResult, Evaluation, Level, Piece, PieceKind } from "./types";
 import { PIECE_LABELS, WALL_KINDS } from "./types";
+import { PieceIcon } from "./PieceIcon";
 
 export function PlayDialog({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -89,48 +90,44 @@ export function CriteriaPanel({ evaluation, onExplain, completeLine, onNext }: {
   );
 }
 
-export function PieceTray({ level, pieces, tool, onTool, showLight, onLight, onReset, onInfo }: {
+export function BoardTools({ level, pieces, tool, onTool, showLight, onLight, onReset, onInfo }: {
   level: Level;
   pieces: Piece[];
   tool: PieceKind | "erase" | null;
-  onTool: (kind: PieceKind | "erase") => void;
+  onTool: (tool: PieceKind | "erase") => void;
   showLight: boolean;
   onLight: () => void;
   onReset: () => void;
   onInfo: () => void;
 }) {
   return (
-    <section className="pg-tray" aria-label="Building pieces and controls">
-      <div className="pg-section-heading">
-        <h2>Pieces</h2>
-        <span>Extras are optional</span>
-      </div>
-      <div className={`pg-tray-pieces ${level.palette.length > 5 ? "is-many" : ""}`}>
+    <>
+      <div className="pg-board-palette" role="group" aria-label="Building pieces. Counts show used inventory; extras are optional." style={{ ["--piece-total" as string]: level.palette.length + 1 }}>
         {level.palette.map((entry) => {
           const used = pieces.filter((piece) => piece.kind === entry.kind).length;
           return (
-            <button type="button" key={entry.kind}
-              className={`pg-tool ${tool === entry.kind ? "is-active" : ""} ${used >= entry.max ? "is-spent" : ""}`}
+            <button key={entry.kind} type="button"
+              className={`pg-tool pg-piece-tile ${tool === entry.kind ? "is-active" : ""} ${used >= entry.max ? "is-spent" : ""}`}
               onClick={() => onTool(entry.kind)} aria-pressed={tool === entry.kind}
+              title={`${PIECE_LABELS[entry.kind]} · ${used}/${entry.max} used · ${WALL_KINDS.has(entry.kind) ? "Wall" : "Floor"}`}
               aria-label={`${PIECE_LABELS[entry.kind]}, ${used} of ${entry.max} used, place on ${WALL_KINDS.has(entry.kind) ? "wall" : "floor"}`}>
-              <span className="pg-tool-name">{PIECE_LABELS[entry.kind]}</span>
-              <span className="pg-tool-count">{used}/{entry.max}</span>
+              <PieceIcon kind={entry.kind} />
+              <span className="pg-tool-count" aria-hidden="true">{used}/{entry.max}</span>
             </button>
           );
         })}
-        <button type="button" className={`pg-tool pg-tool-erase ${tool === "erase" ? "is-active" : ""}`}
-          onClick={() => onTool("erase")} aria-pressed={tool === "erase"}><Eraser /><span className="pg-tool-name">Remove</span></button>
+        <button type="button" className={`pg-tool pg-piece-tile pg-tool-erase ${tool === "erase" ? "is-active" : ""}`}
+          onClick={() => onTool("erase")} aria-pressed={tool === "erase"} aria-label="Remove" title="Remove a piece"><Eraser aria-hidden="true" /></button>
       </div>
-      <div className="pg-tray-footer">
-        <p className="pg-placement-hint" aria-live="polite">
-          {tool === "erase" ? "Tap a piece to remove it." : tool && WALL_KINDS.has(tool) ? "Tap a wall to place." : "Tap a floor tile to place."}
-        </p>
-        <div className="pg-tray-actions">
-          <button type="button" className={`pg-chip ${showLight ? "is-on" : ""}`} onClick={onLight} aria-pressed={showLight}><Lightbulb />Daylight</button>
-          <button type="button" className="pg-chip" onClick={onReset}><RotateCcw />Reset</button>
-          <button type="button" className="pg-icon-button" onClick={onInfo} aria-label="About this pattern"><Info /></button>
-        </div>
+      <p className="pg-placement-hint" aria-live="polite" aria-atomic="true">
+        <strong>{tool === "erase" ? "Remove" : tool ? PIECE_LABELS[tool] : "Select a piece"}</strong>
+        <span>{tool === "erase" ? "Tap a piece" : tool && WALL_KINDS.has(tool) ? "Tap a wall" : "Tap a floor tile"}</span>
+      </p>
+      <div className="pg-board-actions" role="group" aria-label="Board controls">
+        <button type="button" className={`pg-icon-button ${showLight ? "is-on" : ""}`} onClick={onLight} aria-pressed={showLight} aria-label="Daylight" title="Show daylight"><Lightbulb aria-hidden="true" /></button>
+        <button type="button" className="pg-icon-button" onClick={onReset} aria-label="Reset" title="Reset this layout"><RotateCcw aria-hidden="true" /></button>
+        <button type="button" className="pg-icon-button" onClick={onInfo} aria-label="About this pattern" title="About this pattern"><Info aria-hidden="true" /></button>
       </div>
-    </section>
+    </>
   );
 }

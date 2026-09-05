@@ -289,7 +289,7 @@ function AlcoveBay({ seg, h, shade }: { seg: WallSeg; h: number; shade: string }
   );
 }
 
-function PieceGlyph({ kind, x, y }: { kind: PieceKind; x: number; y: number }) {
+export function PieceGlyph({ kind, x, y }: { kind: PieceKind; x: number; y: number }) {
   const c = iso(x + 0.5, y + 0.5);
   switch (kind) {
     case "seat":
