@@ -30,7 +30,7 @@ export default function Play() {
 
   const [pieces, setPieces] = useState<Piece[]>(() => progress.layoutFor(level.slug) ?? level.starting);
   const [tool, setTool] = useState<PieceKind | "erase" | null>(level.palette[0]?.kind ?? null);
-  const [showLight, setShowLight] = useState(false);
+  const [showLight, setShowLight] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [celebrated, setCelebrated] = useState(false);
   const [people, setPeople] = useState<Inhabitant[]>([]);

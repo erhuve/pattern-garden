@@ -38,6 +38,7 @@ export type Cell = { x: number; y: number };
 export type Evaluation = {
   checks: CheckResult[];
   attractors: Cell[];
+  unhappy?: Cell[];
   score: number;
 };
 
@@ -55,7 +56,7 @@ export type Level = {
   room: Rect;
   palette: PaletteEntry[];
   starting: Piece[];
-  evaluate: (layout: Layout) => { checks: CheckResult[]; attractors: Cell[] };
+  evaluate: (layout: Layout) => { checks: CheckResult[]; attractors: Cell[]; unhappy?: Cell[] };
 };
 
 export function isWallPiece(p: Piece): p is WallPiece {

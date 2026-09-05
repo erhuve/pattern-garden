@@ -534,6 +534,11 @@ body {
   pointer-events: none;
   animation: pg-dash 2.4s linear infinite;
 }
+.pg-unhappy {
+  fill: #c0503a;
+  opacity: 0.32;
+  pointer-events: none;
+}
 @keyframes pg-dash {
   to {
     stroke-dashoffset: -12;

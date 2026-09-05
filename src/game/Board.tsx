@@ -109,6 +109,7 @@ export function Board({ level, layout, evaluation, people, tool, onTarget, showL
   const minY = -WALL_H - 40;
   const maxY = iso(world.w, world.h).y + 30;
   const attract = new Set(evaluation.attractors.map((c) => `${c.x},${c.y}`));
+  const unhappySeats = new Set((evaluation.unhappy ?? []).map((c) => `${c.x},${c.y}`));
 
   const isHoverCell = (x: number, y: number) => hover?.type === "cell" && hover.x === x && hover.y === y;
   const isHoverWall = (s: Side, pos: number) => hover?.type === "wall" && hover.side === s && hover.pos === pos;
@@ -172,10 +173,12 @@ export function Board({ level, layout, evaluation, people, tool, onTarget, showL
       const inside = x >= room.x && x < room.x + room.w && y >= room.y && y < room.y + room.h;
       const lit = inside && showLight ? lightCount(layout, { x, y }) : 0;
       const isA = attract.has(`${x},${y}`);
+      const unhappy = unhappySeats.has(`${x},${y}`);
       ground.push(
         <g key={`c${x}-${y}`}>
           <polygon points={diamond(x, y)} className={inside ? "pg-floor" : "pg-grass"} />
           {lit > 0 && <polygon points={diamond(x, y)} className="pg-light" style={{ opacity: Math.min(0.55, 0.22 * lit) }} />}
+          {unhappy && <polygon points={diamond(x, y)} className="pg-unhappy" />}
           {isA && <polygon points={diamond(x, y)} className="pg-attract" />}
           {isHoverCell(x, y) && tool && !wallTool && <polygon points={diamond(x, y)} className="pg-hover" />}
         </g>,

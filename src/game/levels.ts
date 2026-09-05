@@ -81,16 +81,18 @@ const lightOnTwoSides: Level = {
     const anyAdjacentPair = sides.some((a) => sides.some((b) => adjacentSides(a, b)));
     const seats = cellPieces(layout).filter((p) => p.kind === "seat");
     const seatsInDouble = seats.filter((s) => lightCount(layout, s) >= 2).length;
+    const unhappy = seats.filter((s) => lightCount(layout, s) < 2);
     const darkCells = lit.filter((n) => n === 0).length;
     const attractors = cells.filter((c) => lightCount(layout, c) >= 2);
     return {
       checks: [
         check("two-sides", "Windows on two different sides", 40, sides.length >= 2, sides.length >= 2 ? `Light arrives from ${sides.length} sides.` : wins.length === 0 ? "No windows yet — the room is a box." : "All the light comes from one direction; faces and forms flatten out."),
         check("corner", "The two sides meet at a corner", 20, anyAdjacentPair, anyAdjacentPair ? "Cross-light models every surface softly." : "Opposite windows glare at each other; adjacent walls give gentler modelling."),
-        check("seats", "Every seat sits in double light", 25, seats.length === 0 ? 0 : seatsInDouble / seats.length, seats.length === 0 ? "Add a seat and put it where two windows reach." : `${seatsInDouble} of ${seats.length} seats rest in overlapping light.`),
+        check("seats", "Every seat sits in double light", 25, seats.length === 0 ? 0 : seatsInDouble / seats.length, seats.length === 0 ? "Add a seat and put it where two windows reach." : unhappy.length === 0 ? `All ${seats.length} seats rest in overlapping light.` : `${seatsInDouble} of ${seats.length} seats rest in overlapping light. Light reaches 3 tiles in from each window and 1 tile to either side — the seat marked in red is outside the overlap; move it onto a dotted tile.`),
         check("no-dark", "No dark corner left over", 15, cells.length === 0 ? 0 : 1 - darkCells / cells.length, darkCells === 0 ? "Every part of the room is touched by daylight." : `${darkCells} cells never see a window.`),
       ],
       attractors,
+      unhappy,
     };
   },
 };
@@ -298,11 +300,11 @@ export function levelBySlug(slug: string | undefined): Level | undefined {
 }
 
 export function evaluate(level: Level, layout: Layout): Evaluation {
-  const { checks, attractors } = level.evaluate(layout);
+  const { checks, attractors, unhappy } = level.evaluate(layout);
   const total = checks.reduce((n, c) => n + c.points, 0);
   const earned = checks.reduce((n, c) => n + c.earned, 0);
   const score = total === 0 ? 0 : Math.floor((earned / total) * 100);
-  return { checks, attractors, score };
+  return { checks, attractors, unhappy, score };
 }
 
 export { roomCells, inRoom };
