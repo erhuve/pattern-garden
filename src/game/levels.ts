@@ -51,6 +51,14 @@ export function lightCount(layout: Layout, c: Cell): number {
     .filter((w) => litBy(layout.room, w, c)).length;
 }
 
+function lightSideCount(layout: Layout, c: Cell): number {
+  return new Set(
+    wallPieces(layout)
+      .filter((p) => p.kind === "window" && litBy(layout.room, p, c))
+      .map((window) => window.side),
+  ).size;
+}
+
 function adjacentSides(a: Side, b: Side): boolean {
   const opposite: Record<Side, Side> = { n: "s", s: "n", e: "w", w: "e" };
   return a !== b && opposite[a] !== b;
@@ -81,16 +89,16 @@ const lightOnTwoSides: Level = {
     const lit = cells.map((c) => lightCount(layout, c));
     const anyAdjacentPair = sides.some((a) => sides.some((b) => adjacentSides(a, b)));
     const seats = cellPieces(layout).filter((p) => p.kind === "seat");
-    const seatsInDouble = seats.filter((s) => lightCount(layout, s) >= 2).length;
-    const unhappy = seats.filter((s) => lightCount(layout, s) < 2);
+    const seatsInDouble = seats.filter((s) => lightSideCount(layout, s) >= 2).length;
+    const unhappy = seats.filter((s) => lightSideCount(layout, s) < 2);
     const requiredSeats = 2;
     const darkCells = lit.filter((n) => n === 0).length;
-    const attractors = cells.filter((c) => lightCount(layout, c) >= 2);
+    const attractors = cells.filter((c) => lightSideCount(layout, c) >= 2);
     return {
       checks: [
         check("two-sides", "Windows on two different sides", 40, sides.length >= 2, sides.length >= 2 ? `Light arrives from ${sides.length} sides.` : wins.length === 0 ? "No windows yet — the room is a box." : "All the light comes from one direction; faces and forms flatten out."),
         check("corner", "The two sides meet at a corner", 20, anyAdjacentPair, anyAdjacentPair ? "Cross-light models every surface softly." : "Opposite windows glare at each other; adjacent walls give gentler modelling."),
-        check("seats", "Both seats sit in double light", 25, seatsInDouble / requiredSeats, seats.length === 0 ? "Add both seats and put them where two windows reach." : seats.length < requiredSeats && unhappy.length === 0 ? "The first seat rests in overlapping light. Add the second seat to complete the room." : seatsInDouble === requiredSeats ? "Both seats rest in overlapping light." : `${seatsInDouble} of ${requiredSeats} seats rest in overlapping light. Light reaches 3 tiles in from each window and 1 tile to either side — any seat marked in red is outside the overlap; move it onto a dotted tile.`),
+        check("seats", "Both seats sit in cross-light", 25, seatsInDouble / requiredSeats, seats.length === 0 ? "Add both seats and put them where windows on two different walls reach." : seats.length < requiredSeats && unhappy.length === 0 ? "The first seat rests in cross-light. Add the second seat to complete the room." : seatsInDouble === requiredSeats ? "Both seats receive light from two different walls." : `${seatsInDouble} of ${requiredSeats} seats receive light from two different walls. Light reaches 3 tiles in from each window and 1 tile to either side — any seat marked in red needs to move onto a dotted tile.`),
         check("no-dark", "No dark corner left over", 15, cells.length === 0 ? 0 : 1 - darkCells / cells.length, darkCells === 0 ? "Every part of the room is touched by daylight." : `${darkCells} cells never see a window.`),
       ],
       attractors,
@@ -305,7 +313,8 @@ export function evaluate(level: Level, layout: Layout): Evaluation {
   const { checks, attractors, unhappy } = level.evaluate(layout);
   const total = checks.reduce((n, c) => n + c.points, 0);
   const earned = checks.reduce((n, c) => n + c.earned, 0);
-  const score = total === 0 ? 0 : Math.floor((earned / total) * 100);
+  const rawScore = total === 0 ? 0 : Math.floor((earned / total) * 100);
+  const score = checks.every((check) => check.ratio >= 1) ? 100 : Math.min(99, rawScore);
   return { checks, attractors, unhappy, score };
 }
 

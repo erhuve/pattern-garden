@@ -174,7 +174,7 @@ export default function Play() {
           </div>
 
           <div className="pg-palette">
-            <div className="pg-side-label">pieces</div>
+            <div className="pg-side-label">pieces · extras are optional</div>
             <div className="pg-palette-grid">
               {level.palette.map((p) => {
                 const used = usedOf(p.kind);

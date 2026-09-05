@@ -16,7 +16,7 @@ function layoutWith(...pieces: Piece[]): Layout {
 
 describe("Light on Two Sides", () => {
   test("does not complete with only one well-lit seat", () => {
-    const result = evaluate(level, layoutWith({ kind: "seat", x: 2, y: 2 }));
+    const result = evaluate(level, layoutWith({ kind: "seat", x: 3, y: 2 }));
 
     expect(result.score).toBeLessThan(100);
     expect(result.checks.find((check) => check.id === "seats")?.ratio).toBe(0.5);
@@ -26,12 +26,41 @@ describe("Light on Two Sides", () => {
     const result = evaluate(
       level,
       layoutWith(
-        { kind: "seat", x: 2, y: 2 },
         { kind: "seat", x: 3, y: 2 },
+        { kind: "seat", x: 4, y: 2 },
       ),
     );
 
     expect(result.score).toBe(100);
+  });
+
+  test("does not mistake two windows on one wall for cross-light", () => {
+    const result = evaluate(level, {
+      world: level.world,
+      room: level.room,
+      pieces: [
+        { kind: "window", side: "n", pos: 0 },
+        { kind: "window", side: "n", pos: 1 },
+        { kind: "window", side: "e", pos: 1 },
+        { kind: "seat", x: 2, y: 2 },
+        { kind: "seat", x: 2, y: 3 },
+      ],
+    });
+
+    expect(result.checks.find((check) => check.id === "seats")?.ratio).toBe(0);
+    expect(result.score).toBeLessThan(100);
+  });
+
+  test("never rounds an incomplete check up to 100 percent", () => {
+    const synthetic = {
+      ...level,
+      evaluate: () => ({
+        checks: [{ id: "almost", label: "Almost", detail: "One sliver remains.", points: 1, earned: 1, ratio: 0.99 }],
+        attractors: [],
+      }),
+    };
+
+    expect(evaluate(synthetic, layoutWith()).score).toBe(99);
   });
 });
 
