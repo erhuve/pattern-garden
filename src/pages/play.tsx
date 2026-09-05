@@ -162,8 +162,10 @@ export default function Play() {
         <aside className="pg-side">
           <div className="pg-score">
             <div className="pg-score-ring" style={{ ["--p" as string]: `${score}%` }}>
-              <span>{score}</span>
-              <small>%</small>
+              <div className="pg-score-value">
+                <span>{score}</span>
+                <small>%</small>
+              </div>
             </div>
             <div>
               <b>fulfilled</b>

@@ -852,21 +852,26 @@ body {
   border-radius: 50%;
   background: var(--pg-paper);
 }
-.pg-score-ring span,
-.pg-score-ring small {
+.pg-score-value {
   position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 2px;
+}
+.pg-score-value span,
+.pg-score-value small {
   font-family: var(--pg-serif);
 }
-.pg-score-ring span {
+.pg-score-value span {
   font-size: 1.7rem;
   font-weight: 500;
   line-height: 1;
 }
-.pg-score-ring small {
+.pg-score-value small {
   font-size: 0.7rem;
   color: var(--pg-ink-3);
-  margin-top: 14px;
-  margin-left: 1px;
 }
 
 .pg-palette,
