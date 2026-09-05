@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, ArrowRight, Check, Eraser, Lightbulb, RotateCcw, Sparkles, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, X } from "lucide-react";
 import { Board, type Target } from "@/game/Board";
+import { CriteriaPanel, PieceTray, PlayDialog } from "@/game/PlayControls";
 import { LEVELS, evaluate } from "@/game/levels";
 import type { Layout, Piece, PieceKind } from "@/game/types";
 import { PIECE_LABELS, WALL_KINDS } from "@/game/types";
@@ -9,6 +10,7 @@ import { placeAt, removeAt } from "@/game/geometry";
 import { retarget, spawn, step, type Inhabitant } from "@/game/inhabitants";
 import { useProgress } from "@/game/progress";
 import { PATTERNS } from "@/game/patterns";
+import "./play-layout.css";
 
 function mulberry(seed: number) {
   let a = seed >>> 0;
@@ -23,17 +25,20 @@ function mulberry(seed: number) {
 
 export default function Play() {
   const { slug } = useParams();
-  const navigate = useNavigate();
-  const idx = LEVELS.findIndex((l) => l.slug === slug);
-  const level = LEVELS[idx] ?? LEVELS[0];
-  const progress = useProgress();
+  const idx = Math.max(0, LEVELS.findIndex((level) => level.slug === slug));
+  return <PlayLevel key={LEVELS[idx].slug} idx={idx} />;
+}
 
+function PlayLevel({ idx }: { idx: number }) {
+  const navigate = useNavigate();
+  const level = LEVELS[idx];
+  const progress = useProgress();
   const [pieces, setPieces] = useState<Piece[]>(() => progress.layoutFor(level.slug) ?? level.starting);
   const [tool, setTool] = useState<PieceKind | "erase" | null>(level.palette[0]?.kind ?? null);
   const [showLight, setShowLight] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
-  const [celebrated, setCelebrated] = useState(false);
-  const [people, setPeople] = useState<Inhabitant[]>([]);
+  const [dialog, setDialog] = useState<{ kind: "about" } | { kind: "check"; id: string } | null>(null);
+  const [people, setPeople] = useState<Inhabitant[]>(() => spawn({ world: level.world, room: level.room, pieces: [] }, level.inhabitants));
 
   const layout: Layout = { world: level.world, room: level.room, pieces };
   const evaluation = evaluate(level, layout);
@@ -42,16 +47,7 @@ export default function Play() {
   const prev = LEVELS[idx - 1];
 
   useEffect(() => {
-    setPieces(progress.layoutFor(level.slug) ?? level.starting);
-    setTool(level.palette[0]?.kind ?? null);
-    setCelebrated(false);
-    setMessage(null);
-    setPeople(spawn({ world: level.world, room: level.room, pieces: [] }, level.inhabitants));
-  }, [level.slug]);
-
-  useEffect(() => {
     progress.record(level.slug, evaluation.score, layout);
-    if (evaluation.score >= 100 && !celebrated) setCelebrated(true);
   }, [evaluation.score, pieces]);
 
   const rng = useRef(mulberry(7));
@@ -85,10 +81,6 @@ export default function Play() {
     return () => cancelAnimationFrame(raf);
   }, [attractorsKey, pieces.length, level.slug]);
 
-  function usedOf(kind: PieceKind) {
-    return pieces.filter((p) => p.kind === kind).length;
-  }
-
   function handleTarget(t: Target) {
     setMessage(null);
     if (!tool) return;
@@ -107,7 +99,7 @@ export default function Play() {
       setMessage(`${PIECE_LABELS[tool]} goes on the floor — tap a tile inside the room.`);
       return;
     }
-    if (usedOf(tool) >= entry.max) {
+    if (pieces.filter((piece) => piece.kind === tool).length >= entry.max) {
       setMessage(`You only have ${entry.max} ${PIECE_LABELS[tool].toLowerCase()}${entry.max === 1 ? "" : "s"} for this place.`);
       return;
     }
@@ -117,25 +109,31 @@ export default function Play() {
   }
 
   const score = evaluation.score;
+  const explainedCheck = dialog?.kind === "check" ? evaluation.checks.find((check) => check.id === dialog.id) : undefined;
 
   return (
-    <main className="pg-play">
+    <main className="pg-play pg-workbench">
       <header className="pg-play-head">
-        <Link to="/" className="pg-back">
-          <ArrowLeft /> patterns
-        </Link>
+        <Link to="/" className="pg-back" aria-label="All patterns"><ArrowLeft /><span>patterns</span></Link>
         <div className="pg-play-title">
           <span className="pg-num">{level.number}</span>
           <h1>{level.title}</h1>
         </div>
-        <div className="pg-play-nav">
-          {prev ? <button onClick={() => navigate(`/play/${prev.slug}`)} aria-label="Previous pattern"><ArrowLeft /></button> : <span />}
-          {next ? <button onClick={() => navigate(`/play/${next.slug}`)} aria-label="Next pattern"><ArrowRight /></button> : <span />}
+        <div className="pg-header-tools">
+          <div className="pg-score" role="status" aria-label={`${score}% fulfilled`} aria-live="polite" aria-atomic="true">
+            <div className="pg-score-ring" style={{ ["--p" as string]: `${score}%` }} aria-hidden="true">
+              <div className="pg-score-value"><span>{score}</span><small>%</small></div>
+            </div>
+            <span className="pg-score-caption">{score === 100 ? "alive" : "fulfilled"}</span>
+          </div>
+          <nav className="pg-play-nav" aria-label="Pattern navigation">
+            {prev && <button onClick={() => navigate(`/play/${prev.slug}`)} aria-label="Previous pattern"><ArrowLeft /></button>}
+            {next && <button onClick={() => navigate(`/play/${next.slug}`)} aria-label="Next pattern"><ArrowRight /></button>}
+          </nav>
         </div>
       </header>
-
       <div className="pg-play-grid">
-        <section className="pg-stage">
+        <section className="pg-stage" aria-label="Building board">
           <Board level={level} layout={layout} evaluation={evaluation} people={people} tool={tool} onTarget={handleTarget} showLight={showLight} />
           {message && (
             <div className="pg-toast" role="status">
@@ -143,96 +141,33 @@ export default function Play() {
               <button onClick={() => setMessage(null)} aria-label="Dismiss"><X /></button>
             </div>
           )}
-          {celebrated && score >= 100 && (
-            <div className="pg-complete" role="status">
-              <Sparkles />
-              <div>
-                <b>The pattern is alive.</b>
-                <span>{level.completeLine}</span>
-              </div>
-              {next && (
-                <button onClick={() => navigate(`/play/${next.slug}`)}>
-                  next pattern <ArrowRight />
-                </button>
-              )}
-            </div>
-          )}
         </section>
-
-        <aside className="pg-side">
-          <div className="pg-score">
-            <div className="pg-score-ring" style={{ ["--p" as string]: `${score}%` }}>
-              <div className="pg-score-value">
-                <span>{score}</span>
-                <small>%</small>
-              </div>
-            </div>
-            <div>
-              <b>fulfilled</b>
-              <p>{score >= 100 ? "Every check passes." : score >= 60 ? "Almost there. Look at what is still missing." : "Start placing pieces and watch the checks light up."}</p>
-            </div>
-          </div>
-
-          <div className="pg-palette">
-            <div className="pg-side-label">pieces · extras are optional</div>
-            <div className="pg-palette-grid">
-              {level.palette.map((p) => {
-                const used = usedOf(p.kind);
-                const active = tool === p.kind;
-                return (
-                  <button
-                    key={p.kind}
-                    className={`pg-tool ${active ? "is-active" : ""} ${used >= p.max ? "is-spent" : ""}`}
-                    onClick={() => setTool(p.kind)}
-                    aria-pressed={active}
-                  >
-                    <span className="pg-tool-name">{PIECE_LABELS[p.kind]}</span>
-                    <span className="pg-tool-count">{used}/{p.max}</span>
-                    <span className="pg-tool-where">{WALL_KINDS.has(p.kind) ? "wall" : "floor"}</span>
-                  </button>
-                );
-              })}
-              <button className={`pg-tool pg-tool-erase ${tool === "erase" ? "is-active" : ""}`} onClick={() => setTool("erase")} aria-pressed={tool === "erase"}>
-                <Eraser /> <span className="pg-tool-name">remove</span>
-              </button>
-            </div>
-            <div className="pg-palette-actions">
-              <button className={`pg-chip ${showLight ? "is-on" : ""}`} onClick={() => setShowLight((v) => !v)} aria-pressed={showLight}>
-                <Lightbulb /> daylight
-              </button>
-              <button className="pg-chip" onClick={() => { setPieces(level.starting); progress.reset(level.slug); setCelebrated(false); }}>
-                <RotateCcw /> clear
-              </button>
-            </div>
-          </div>
-
-          <div className="pg-checks">
-            <div className="pg-side-label">what the pattern asks</div>
-            <ul>
-              {evaluation.checks.map((c) => (
-                <li key={c.id} className={c.ratio >= 1 ? "is-pass" : c.ratio > 0 ? "is-partial" : ""}>
-                  <span className="pg-check-mark">{c.ratio >= 1 ? <Check /> : <i style={{ ["--r" as string]: c.ratio }} />}</span>
-                  <div>
-                    <b>{c.label}</b>
-                    <p>{c.detail}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <details className="pg-source">
-            <summary>from the book</summary>
-            <p className="pg-quote">{level.quote}</p>
-            {pattern && (
-              <p className="pg-meta">
-                Pattern {pattern.number} · {pattern.section} · {pattern.subsection}
-                {pattern.stars > 0 && <> · {"★".repeat(pattern.stars)}</>}
-              </p>
-            )}
-          </details>
-        </aside>
+        <PieceTray level={level} pieces={pieces} tool={tool} onTool={(kind) => { setTool(kind); setMessage(null); }}
+          showLight={showLight} onLight={() => setShowLight((value) => !value)}
+          onReset={() => { setPieces(level.starting); progress.reset(level.slug); setMessage(null); }}
+          onInfo={() => setDialog({ kind: "about" })} />
+        <CriteriaPanel evaluation={evaluation} completeLine={level.completeLine}
+          onNext={next ? () => navigate(`/play/${next.slug}`) : undefined}
+          onExplain={(check) => setDialog({ kind: "check", id: check.id })} />
       </div>
+      <PlayDialog open={dialog !== null} onClose={() => setDialog(null)} title={explainedCheck?.label ?? "About this pattern"}>
+        {explainedCheck ? (
+          <>
+            <p className="pg-meta">{explainedCheck.ratio >= 1 ? "Met" : explainedCheck.ratio > 0 ? "Partly met" : "Not yet met"}</p>
+            <p>{explainedCheck.detail}</p>
+          </>
+        ) : (
+          <>
+            <p className="pg-quote">{level.quote}</p>
+            {pattern && <p className="pg-meta">Pattern {pattern.number} · {pattern.section} · {pattern.subsection}{pattern.stars > 0 && <> · {"★".repeat(pattern.stars)}</>}</p>}
+            <nav className="pg-dialog-nav" aria-label="Browse patterns">
+              {prev && <Link className="pg-chip" to={`/play/${prev.slug}`}><ArrowLeft />Previous pattern</Link>}
+              {next && <Link className="pg-chip" to={`/play/${next.slug}`}>Next pattern<ArrowRight /></Link>}
+              <Link className="pg-chip" to="/">All patterns</Link>
+            </nav>
+          </>
+        )}
+      </PlayDialog>
     </main>
   );
 }

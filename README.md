@@ -40,6 +40,23 @@ This is a **Zo Site** - a web application running on a user's Zo computer that c
 - **Frontend**: React + Vite with client-side routing, shadcn/ui components, and Tailwind CSS 4
 - **Single Process**: Vite runs in middleware mode (no separate dev server)
 
+## Play-screen layout
+
+The play screen uses a viewport-height workbench. Desktop has a resizable board with a horizontal piece tray below it and a dedicated criteria column; the score sits in the header. Phone layouts use a compact two-row tray and two-column checklist. Select a criterion for its current explanation (inline on desktop, a native modal sheet on phones and short screens). Completion appears beside the criteria rather than covering the board. About preserves the book context and previous/next navigation on mobile.
+
+`src/pages/play-layout.css` scopes layout overrides to the play screen. Do not reduce touch targets below 44px or clip criteria to enforce a fixed height. At 320px widths, very short viewports, or enlarged text, scrolling is an intentional accessibility fallback. Keyed `PlayLevel` instances prevent route changes from recording the previous level's pieces under the next level.
+
+Validation:
+
+```bash
+bun test src/game
+bunx tsc --noEmit
+bun run build
+python3 tests/play_layout.py --build-dir dist
+```
+
+The browser suite requires Python Playwright and Chromium (`python3 -m pip install playwright` and `python3 -m playwright install chromium`). `--build-dir` tests an isolated build through intercepted browser requests without a server; `--base-url` tests a running deployment in a fresh browser profile. `--screenshots <directory>` saves desktop, phone, landscape and completion evidence. The suite checks all five levels across ten viewport sizes, text/320px fallbacks, modal focus, actual touch placement/removal, score persistence and level navigation.
+
 ## Architecture
 
 ### File Structure
