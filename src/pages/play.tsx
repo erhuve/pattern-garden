@@ -100,11 +100,11 @@ export default function Play() {
     if (!entry) return;
     const wallKind = WALL_KINDS.has(tool);
     if (wallKind && t.type !== "wall") {
-      setMessage(`${PIECE_LABELS[tool]} goes on a wall — click the edge of the room.`);
+      setMessage(`${PIECE_LABELS[tool]} goes on a wall — tap the edge of the room.`);
       return;
     }
     if (!wallKind && t.type !== "cell") {
-      setMessage(`${PIECE_LABELS[tool]} goes on the floor — click a tile.`);
+      setMessage(`${PIECE_LABELS[tool]} goes on the floor — tap a tile inside the room.`);
       return;
     }
     if (usedOf(tool) >= entry.max) {

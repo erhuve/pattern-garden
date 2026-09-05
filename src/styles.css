@@ -503,6 +503,7 @@ body {
 }
 .pg-board {
   display: block;
+  touch-action: manipulation;
   width: 100%;
   height: auto;
   max-height: 72vh;
@@ -542,10 +543,10 @@ body {
   fill: rgba(255, 255, 255, 0.55);
   pointer-events: none;
 }
-.pg-cell-hit,
 .pg-wall-hit {
   fill: transparent;
   stroke: none;
+  pointer-events: none;
 }
 .pg-wall-hit.is-hover {
   fill: rgba(255, 255, 255, 0.45);

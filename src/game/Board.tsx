@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { Cell, Evaluation, Layout, Level, PieceKind, Side, WallPiece } from "./types";
 import { interiorCell, wallLength } from "./geometry";
 import { lightCount } from "./levels";
@@ -45,6 +45,44 @@ function wallFace(seg: WallSeg, h: number): string {
   return poly([seg.a, seg.b, { x: seg.b.x, y: seg.b.y - h }, { x: seg.a.x, y: seg.a.y - h }]);
 }
 
+function facePoly(seg: WallSeg, h: number): P[] {
+  return [seg.a, seg.b, { x: seg.b.x, y: seg.b.y - h }, { x: seg.a.x, y: seg.a.y - h }];
+}
+
+function pointInPoly(pt: P, poly: P[]): boolean {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const a = poly[i];
+    const b = poly[j];
+    if (a.y > pt.y !== b.y > pt.y && pt.x < ((b.x - a.x) * (pt.y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
+  }
+  return inside;
+}
+
+function segDist(pt: P, a: P, b: P): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len2 = dx * dx + dy * dy || 1;
+  const t = Math.max(0, Math.min(1, ((pt.x - a.x) * dx + (pt.y - a.y) * dy) / len2));
+  return Math.hypot(a.x + dx * t - pt.x, a.y + dy * t - pt.y);
+}
+
+function polyDist(pt: P, poly: P[]): number {
+  if (pointInPoly(pt, poly)) return 0;
+  let d = Infinity;
+  for (let i = 0; i < poly.length; i++) d = Math.min(d, segDist(pt, poly[i], poly[(i + 1) % poly.length]));
+  return d;
+}
+
+function cellAt(pt: P, world: { w: number; h: number }): Cell | null {
+  const x = Math.floor(pt.x / TW + pt.y / TH);
+  const y = Math.floor(pt.y / TH - pt.x / TW);
+  if (x < 0 || y < 0 || x >= world.w || y >= world.h) return null;
+  return { x, y };
+}
+
+const SNAP = 26;
+
 function outward(side: Side): Cell {
   return side === "n" ? { x: 0, y: -1 } : side === "s" ? { x: 0, y: 1 } : side === "w" ? { x: -1, y: 0 } : { x: 1, y: 0 };
 }
@@ -75,6 +113,58 @@ export function Board({ level, layout, evaluation, people, tool, onTarget, showL
   const isHoverCell = (x: number, y: number) => hover?.type === "cell" && hover.x === x && hover.y === y;
   const isHoverWall = (s: Side, pos: number) => hover?.type === "wall" && hover.side === s && hover.pos === pos;
   const wallTool = tool === "window" || tool === "door" || tool === "alcove";
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  function toSvgPoint(e: React.PointerEvent): P | null {
+    const svg = svgRef.current;
+    if (!svg) return null;
+    const ctm = svg.getScreenCTM();
+    if (!ctm) return null;
+    const p = svg.createSVGPoint();
+    p.x = e.clientX;
+    p.y = e.clientY;
+    const q = p.matrixTransform(ctm.inverse());
+    return { x: q.x, y: q.y };
+  }
+
+  function nearestWall(pt: P, onlyWithPiece: boolean): { seg: WallSeg; d: number } | null {
+    let best: { seg: WallSeg; d: number } | null = null;
+    for (const seg of segs) {
+      if (onlyWithPiece && !wallMap.has(`${seg.side}${seg.pos}`)) continue;
+      const h = Math.max(seg.front ? KNEE_H : WALL_H, 30);
+      const d = polyDist(pt, facePoly(seg, h));
+      if (!best || d < best.d) best = { seg, d };
+    }
+    return best;
+  }
+
+  const floorPieceAt = (c: Cell) => layout.pieces.some((p) => !("side" in p) && p.x === c.x && p.y === c.y);
+
+  function resolveTarget(pt: P): Target | null {
+    const cell = cellAt(pt, world);
+    if (tool === "erase") {
+      if (cell && floorPieceAt(cell)) return { type: "cell", x: cell.x, y: cell.y };
+      const w = nearestWall(pt, true);
+      if (w && w.d <= 10) return { type: "wall", side: w.seg.side, pos: w.seg.pos };
+    } else if (wallTool) {
+      const w = nearestWall(pt, false);
+      if (w && w.d <= SNAP) return { type: "wall", side: w.seg.side, pos: w.seg.pos };
+    }
+    if (cell) return { type: "cell", x: cell.x, y: cell.y };
+    const w = nearestWall(pt, false);
+    if (w && w.d <= SNAP) return { type: "wall", side: w.seg.side, pos: w.seg.pos };
+    return null;
+  }
+
+  const downAt = useRef<{ x: number; y: number } | null>(null);
+
+  function handlePointer(e: React.PointerEvent<SVGSVGElement>, commit: boolean) {
+    const pt = toSvgPoint(e);
+    if (!pt) return;
+    const t = resolveTarget(pt);
+    setHover(t);
+    if (commit && t) onTarget(t);
+  }
 
   const ground: React.ReactNode[] = [];
   for (let y = 0; y < world.h; y++)
@@ -136,9 +226,6 @@ export function Board({ level, layout, evaluation, people, tool, onTarget, showL
           points={wallFace(seg, Math.max(h, 30))}
           className={`pg-wall-hit ${hovered ? "is-hover" : ""}`}
           data-wall={`${seg.side}${seg.pos}`}
-          onMouseEnter={() => setHover({ type: "wall", side: seg.side, pos: seg.pos })}
-          onMouseLeave={() => setHover(null)}
-          onClick={() => onTarget({ type: "wall", side: seg.side, pos: seg.pos })}
         />
         {hovered && <circle cx={mid.x} cy={mid.y - h / 2} r={3} className="pg-hover-dot" />}
       </g>
@@ -147,10 +234,24 @@ export function Board({ level, layout, evaluation, people, tool, onTarget, showL
 
   return (
     <svg
+      ref={svgRef}
       viewBox={`${minX} ${minY} ${maxX - minX} ${maxY - minY}`}
       className="pg-board"
       role="img"
       aria-label={`${level.title} board`}
+      onPointerMove={(e) => {
+        if (e.pointerType === "mouse") handlePointer(e, false);
+      }}
+      onPointerLeave={() => setHover(null)}
+      onPointerDown={(e) => {
+        downAt.current = { x: e.clientX, y: e.clientY };
+      }}
+      onPointerUp={(e) => {
+        const d = downAt.current;
+        downAt.current = null;
+        if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 12) return;
+        handlePointer(e, true);
+      }}
     >
       <g>{ground}</g>
       <g>{backWalls.map(renderWall)}</g>
@@ -163,21 +264,6 @@ export function Board({ level, layout, evaluation, people, tool, onTarget, showL
         ))}
       </g>
       <g>{frontWalls.map(renderWall)}</g>
-      <g>
-        {Array.from({ length: world.h }, (_, y) =>
-          Array.from({ length: world.w }, (_, x) => (
-            <polygon
-              key={`h${x}-${y}`}
-              points={diamond(x, y)}
-              className="pg-cell-hit"
-              data-cell={`${x},${y}`}
-              onMouseEnter={() => setHover({ type: "cell", x, y })}
-              onMouseLeave={() => setHover(null)}
-              onClick={() => onTarget({ type: "cell", x, y })}
-            />
-          )),
-        )}
-      </g>
     </svg>
   );
 }
