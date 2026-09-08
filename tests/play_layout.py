@@ -113,6 +113,9 @@ with sync_playwright() as p:
         for tile in page.locator(".pg-piece-tile").all():
             label = tile.get_attribute("aria-label").split(",")[0]
             tile.tap()
+            if label == "Rotate":
+                expect(page.locator("dialog")).to_be_visible()
+                page.get_by_role("button", name="Close explanation").tap()
             expect(tile).to_have_attribute("aria-pressed", "true")
             expect(page.locator(".pg-piece-tile[aria-pressed=true]")).to_have_count(1)
             expect(page.locator(".pg-placement-hint strong")).to_have_text(label)

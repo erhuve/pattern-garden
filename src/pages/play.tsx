@@ -5,7 +5,9 @@ import { Board, type Target } from "@/game/Board";
 import { CompletionCelebration } from "@/game/CompletionCelebration";
 import { BoardTools, CriteriaPanel, PlayDialog } from "@/game/PlayControls";
 import { LEVELS, evaluate } from "@/game/levels";
-import type { Layout, Piece, PieceKind } from "@/game/types";
+import type { BoardTool, Cell, Layout, Piece } from "@/game/types";
+import { OrientationControls } from "@/game/OrientationControls";
+import { isDirectional, setFacing } from "@/game/orientation";
 import { PIECE_LABELS, WALL_KINDS } from "@/game/types";
 import { placeAt, removeAt } from "@/game/geometry";
 import { retarget, spawn, step, type Inhabitant } from "@/game/inhabitants";
@@ -36,10 +38,10 @@ function PlayLevel({ idx }: { idx: number }) {
   const level = LEVELS[idx];
   const progress = useProgress();
   const [pieces, setPieces] = useState<Piece[]>(() => progress.layoutFor(level.slug) ?? level.starting);
-  const [tool, setTool] = useState<PieceKind | "erase" | null>(level.palette[0]?.kind ?? null);
+  const [tool, setTool] = useState<BoardTool | null>(level.palette[0]?.kind ?? null);
   const [showLight, setShowLight] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
-  const [dialog, setDialog] = useState<{ kind: "about" } | { kind: "check"; id: string } | null>(null);
+  const [dialog, setDialog] = useState<{ kind: "about" } | { kind: "check"; id: string } | { kind: "orientation"; cell: Cell } | { kind: "objects" } | null>(null);
   const [people, setPeople] = useState<Inhabitant[]>(() => spawn({ world: level.world, room: level.room, pieces: [] }, level.inhabitants));
 
   const layout: Layout = { world: level.world, room: level.room, pieces };
@@ -86,6 +88,12 @@ function PlayLevel({ idx }: { idx: number }) {
   function handleTarget(t: Target) {
     setMessage(null);
     if (!tool) return;
+    if (tool === "rotate") {
+      const piece = t.type === "cell" ? pieces.find((p) => isDirectional(p) && p.x === t.x && p.y === t.y) : undefined;
+      if (piece && isDirectional(piece)) setDialog({ kind: "orientation", cell: piece });
+      else setMessage("Tap a seat, shelf or gate to choose its direction. Other pieces do not need rotation.");
+      return;
+    }
     if (tool === "erase") {
       setPieces((ps) => removeAt(level, ps, t));
       return;
@@ -110,6 +118,7 @@ function PlayLevel({ idx }: { idx: number }) {
     else setPieces(result);
   }
 
+  const orientedPiece = dialog?.kind === "orientation" ? pieces.find((p) => isDirectional(p) && p.x === dialog.cell.x && p.y === dialog.cell.y) : undefined;
   const score = evaluation.score;
   const explainedCheck = dialog?.kind === "check" ? evaluation.checks.find((check) => check.id === dialog.id) : undefined;
 
@@ -135,12 +144,12 @@ function PlayLevel({ idx }: { idx: number }) {
         </div>
       </header>
       <div className="pg-play-grid">
-        <section className="pg-stage" aria-label="Building board" style={{ ["--piece-total" as string]: level.palette.length + 1 }}>
+        <section className="pg-stage" aria-label="Building board" style={{ ["--piece-total" as string]: level.palette.length + 2 }}>
           <div className="pg-board-viewport">
             <Board level={level} layout={layout} evaluation={evaluation} people={people} tool={tool} onTarget={handleTarget} showLight={showLight} />
             <CompletionCelebration complete={score === 100} />
           </div>
-          <BoardTools level={level} pieces={pieces} tool={tool} onTool={(kind) => { setTool(kind); setMessage(null); }}
+          <BoardTools level={level} pieces={pieces} tool={tool} onTool={(kind) => { setTool(kind); setMessage(null); if (kind === "rotate") setDialog({ kind: "objects" }); }}
             showLight={showLight} onLight={() => setShowLight((value) => !value)}
             onReset={() => { setPieces(level.starting); progress.reset(level.slug); setMessage(null); }}
             onInfo={() => setDialog({ kind: "about" })} />
@@ -155,8 +164,19 @@ function PlayLevel({ idx }: { idx: number }) {
           onNext={next ? () => navigate(`/play/${next.slug}`) : undefined}
           onExplain={(check) => setDialog({ kind: "check", id: check.id })} />
       </div>
-      <PlayDialog open={dialog !== null} onClose={() => setDialog(null)} title={explainedCheck?.label ?? "About this pattern"}>
-        {explainedCheck ? (
+      <PlayDialog open={dialog !== null} onClose={() => setDialog(null)} title={dialog?.kind === "objects" ? "Choose a piece to turn" : orientedPiece ? `Turn ${PIECE_LABELS[orientedPiece.kind].toLowerCase()}` : explainedCheck?.label ?? "About this pattern"}>
+        {dialog?.kind === "objects" ? (
+          <div className="pg-object-chooser">
+            <p>Choose a piece below, or close this panel and tap one on the board. Auto is the default; fixed directions are optional.</p>
+            {pieces.filter(isDirectional).sort((a, b) => a.y - b.y || a.x - b.x).map((piece) => (
+              <button type="button" key={`${piece.x},${piece.y}`} onClick={() => setDialog({ kind: "orientation", cell: piece })}>
+                {PIECE_LABELS[piece.kind]} · column {piece.x + 1}, row {piece.y + 1}
+              </button>
+            ))}
+            {!pieces.some(isDirectional) && <p>Place a seat, shelf or gate first. The other pieces do not need rotation.</p>}
+          </div>
+        ) : orientedPiece && isDirectional(orientedPiece) ? <OrientationControls slug={level.slug} layout={layout} piece={orientedPiece}
+          onChange={(direction) => setPieces((ps) => setFacing(ps, orientedPiece, direction))} /> : explainedCheck ? (
           <>
             <p className="pg-meta">{explainedCheck.ratio >= 1 ? "Met" : explainedCheck.ratio > 0 ? "Partly met" : "Not yet met"}</p>
             <p>{explainedCheck.detail}</p>

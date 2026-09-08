@@ -41,6 +41,20 @@ This is a **Zo Site** - a web application running on a user's Zo computer that c
 - **Frontend**: React + Vite with client-side routing, shadcn/ui components, and Tailwind CSS 4
 - **Single Process**: Vite runs in middleware mode (no separate dev server)
 
+## Object orientation
+
+Seats, bookshelves and gates choose a direction automatically from the current layout. `src/game/orientation.ts` is a pure resolver: final-layout geometry, not insertion order, timers or inhabitants, determines orientation. Missing `CellPiece.facing` means Auto; only deliberate fixed directions are saved. Existing layouts need no orientation migration and retain their coordinates, inventory, scores and completion state.
+
+- Alcove furniture faces its opening back into the common room; a blocked opening is reported honestly.
+- Window Place chairs directly beside actual glazing look toward the glass. Other chairs prefer a nearby table, hearth or seat, then clear inward space. Sitting Circle prefers its hearth, falling back to an accessible table if the hearth is hidden. Shelf/tree occlusion and immediately blocked directions are checked. In crowded layouts Auto is best-effort, never a new placement restriction.
+- Shelves prefer their closed back against a bare wall, otherwise open toward nearby seating or clear room space.
+- Gate passage aligns with the connected path toward a door, then neighboring path stones, then the entrance direction.
+- Walls already determine window/door/alcove alignment. The round/symmetric objects are unchanged.
+
+The Rotate tile provides a keyboard-accessible placed-object chooser; close it to select an object directly on the board instead. Four illustrated fixed directions override Auto and persist through reloads and furniture changes. Selecting Auto removes the override. Rotation never moves or removes pieces and does not change scoring. `DirectionalGlyph.tsx` rotates model XY coordinates before isometric projection, keeps height upright, and uses explicit per-view assembly ordering. Directional meshes are memoized; facing is recomputed only when the layout changes. No rotation animation or new dependency is needed.
+
+Validation includes all four alcove sides and mesh views, obstructed targets, gates and paths, order independence, immutability, legacy saves, unchanged scoring, real touch picking, keyboard focus, mobile palette breakpoints and completion regressions.
+
 ## Play-screen layout
 
 The play screen uses a viewport-height workbench. Desktop has a full-height board and a dedicated criteria column; the score sits in the header. Pieces are miniature icon tiles inside the board's left edge with used/available counters in the bottom-right corner, active highlighting, accessible labels and hover titles. The selected piece name and placement hint appear inside the board, with daylight, reset and About controls at the bottom-right. There is no tray below the board. A dedicated board viewport reserves space for these controls so they never cover placement targets. Phone layouts retain a two-column checklist; the icon rail shrinks to 44px minimum targets and wraps to two columns when board height is limited. Select a criterion for its current explanation (inline on desktop, a native modal sheet on phones and short screens). A newly completed pattern plays a 3.6-second celebration centered over the board (warm ripple, drifting petals and a clear 100% message), then fades; the persistent success summary stays beside the criteria. The overlay never captures input or moves focus. Reduced-motion mode shows the same message without animation. Only a current-score transition from incomplete to 100% triggers it: saved completed layouts and ordinary rerenders do not replay it, and resetting, navigating or dropping below 100% clears it. Completing the pattern again plays a fresh celebration. About preserves the book context and previous/next navigation on mobile.
@@ -55,6 +69,8 @@ bunx tsc --noEmit
 bun run build
 python3 tests/play_layout.py --build-dir dist
 python3 tests/completion_celebration.py --build-dir dist
+python3 tests/orientation.py --build-dir dist
+python3 tests/glyph_occlusion.py
 ```
 
 The browser suite requires Python Playwright and Chromium (`python3 -m pip install playwright` and `python3 -m playwright install chromium`). `--build-dir` tests an isolated build through intercepted browser requests without a server; `--base-url` tests a running deployment in a fresh browser profile. `--screenshots <directory>` saves desktop, phone, landscape and completion evidence. The suite checks all five levels across ten viewport sizes, text/320px fallbacks, modal focus, actual touch placement/removal, score persistence and level navigation. It also checks icon squares and corner counters, full-height stage layout, control/board separation, palette hit targets, touch/keyboard selection without accidental placement, and used inventory updates through placement/removal/reload.

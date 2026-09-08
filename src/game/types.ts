@@ -13,7 +13,8 @@ export type CellPieceKind =
 export type PieceKind = WallPieceKind | CellPieceKind;
 
 export type WallPiece = { kind: WallPieceKind; side: Side; pos: number };
-export type CellPiece = { kind: CellPieceKind; x: number; y: number };
+export type CellPiece = { kind: CellPieceKind; x: number; y: number; facing?: Side };
+export type BoardTool = PieceKind | "erase" | "rotate";
 export type Piece = WallPiece | CellPiece;
 
 export type Rect = { x: number; y: number; w: number; h: number };

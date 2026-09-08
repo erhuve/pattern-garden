@@ -1,5 +1,7 @@
-import { useRef, useState } from "react";
-import type { Cell, Evaluation, Layout, Level, PieceKind, Side, WallPiece } from "./types";
+import { useMemo, useRef, useState } from "react";
+import type { BoardTool, Cell, Evaluation, Layout, Level, PieceKind, Side, WallPiece } from "./types";
+import { DirectionalGlyph } from "./DirectionalGlyph";
+import { resolveFacing } from "./orientation";
 import { alcoveAt, interiorCell, wallLength } from "./geometry";
 import { lightCount } from "./levels";
 import type { Inhabitant } from "./inhabitants";
@@ -92,7 +94,7 @@ type Props = {
   layout: Layout;
   evaluation: Evaluation;
   people: Inhabitant[];
-  tool: PieceKind | "erase" | null;
+  tool: BoardTool | null;
   onTarget: (t: Target) => void;
   showLight: boolean;
 };
@@ -139,9 +141,15 @@ export function Board({ level, layout, evaluation, people, tool, onTarget, showL
     return best;
   }
 
+  const facings = useMemo(() => new Map(layout.pieces.flatMap((p) => "side" in p ? [] : [[`${p.x},${p.y}`, resolveFacing(level.slug, layout, p)] as const])), [level.slug, layout.pieces, layout.room, layout.world]);
+
   const floorPieceAt = (c: Cell) => layout.pieces.some((p) => !("side" in p) && p.x === c.x && p.y === c.y);
 
   function resolveTarget(pt: P): Target | null {
+    if (tool === "rotate") {
+      const cell = cellAt(pt, world);
+      return cell ? { type: "cell", ...cell } : null;
+    }
     const cell = cellAt(pt, world);
     if (tool === "erase") {
       if (cell && floorPieceAt(cell)) return { type: "cell", x: cell.x, y: cell.y };
@@ -162,7 +170,11 @@ export function Board({ level, layout, evaluation, people, tool, onTarget, showL
   function handlePointer(e: React.PointerEvent<SVGSVGElement>, commit: boolean) {
     const pt = toSvgPoint(e);
     if (!pt) return;
-    const t = resolveTarget(pt);
+    const element = e.target instanceof Element ? e.target : null;
+    const paintedPiece = tool === "rotate" ? element?.closest<SVGGElement>("[data-piece-cell]") : null;
+    const paintedWall = tool === "rotate" && !element?.classList.contains("pg-floor") ? element?.closest("[data-wall-surface]") : null;
+    const cell = paintedPiece?.dataset.pieceCell?.split(",").map(Number);
+    const t: Target | null = cell ? { type: "cell", x: cell[0], y: cell[1] } : paintedWall ? null : resolveTarget(pt);
     setHover(t);
     if (commit && t) onTarget(t);
   }
@@ -204,7 +216,7 @@ export function Board({ level, layout, evaluation, people, tool, onTarget, showL
     const lerp = (t: number, z: number): P => ({ x: seg.a.x + dir.x * t, y: seg.a.y + dir.y * t - z });
     const shade = seg.side === "n" || seg.side === "s" ? "pg-wall-a" : "pg-wall-b";
     return (
-      <g key={`w${seg.side}${seg.pos}`} className="pg-wallseg">
+      <g key={`w${seg.side}${seg.pos}`} className="pg-wallseg" data-wall-surface={`${seg.side}${seg.pos}`}>
         {piece?.kind === "door" ? (
           <>
             <polygon points={poly([seg.a, lerp(0.2, 0), lerp(0.2, h), lerp(0, h)])} className={shade} />
@@ -240,20 +252,21 @@ export function Board({ level, layout, evaluation, people, tool, onTarget, showL
     <svg
       ref={svgRef}
       viewBox={`${minX} ${minY} ${maxX - minX} ${maxY - minY}`}
-      className="pg-board"
+      className={`pg-board ${tool === "rotate" ? "is-rotating" : ""}`}
       role="img"
       aria-label={`${level.title} board`}
       onPointerMove={(e) => {
         if (e.pointerType === "mouse") handlePointer(e, false);
       }}
       onPointerLeave={() => setHover(null)}
+      onPointerCancel={() => { downAt.current = null; }}
       onPointerDown={(e) => {
         downAt.current = { x: e.clientX, y: e.clientY };
       }}
       onPointerUp={(e) => {
         const d = downAt.current;
         downAt.current = null;
-        if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 12) return;
+        if (!d || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 12) return;
         handlePointer(e, true);
       }}
     >
@@ -261,7 +274,7 @@ export function Board({ level, layout, evaluation, people, tool, onTarget, showL
       <g>{backWalls.map(renderWall)}</g>
       <g>
         {sortedPieces.flatMap((p, i) =>
-          "side" in p ? [] : [<PieceGlyph key={`p${i}`} kind={p.kind} x={p.x} y={p.y} />],
+          "side" in p ? [] : [<PieceGlyph key={`p${i}`} kind={p.kind} x={p.x} y={p.y} facing={facings.get(`${p.x},${p.y}`)?.direction} manual={facings.get(`${p.x},${p.y}`)?.manual} />],
         )}
         {people.map((h) => (
           <Person key={h.id} p={h} />
@@ -289,21 +302,17 @@ function AlcoveBay({ seg, h, shade }: { seg: WallSeg; h: number; shade: string }
   );
 }
 
-export function PieceGlyph({ kind, x, y }: { kind: PieceKind; x: number; y: number }) {
+export function PieceGlyph({ kind, x, y, facing = "s", manual = false }: { kind: PieceKind; x: number; y: number; facing?: Side; manual?: boolean }) {
   const c = iso(x + 0.5, y + 0.5);
+  if (kind === "seat" || kind === "shelf" || kind === "gate") {
+    return <g transform={`translate(${c.x} ${c.y})`} className="pg-piece" data-piece-cell={`${x},${y}`} data-facing-cell={`${x},${y}`} data-facing={facing} data-facing-mode={manual ? "manual" : "auto"} data-kind={kind}>
+      <DirectionalGlyph kind={kind} facing={facing} />
+    </g>;
+  }
   switch (kind) {
-    case "seat":
-      return (
-        <g transform={`translate(${c.x} ${c.y})`} className="pg-piece">
-          <polygon points={poly([iso(-0.3, -0.3, 10), iso(0.3, -0.3, 10), iso(0.3, 0.3, 10), iso(-0.3, 0.3, 10)])} className="pg-seat" />
-          <polygon points={poly([iso(-0.3, -0.3, 10), iso(0.3, -0.3, 10), iso(0.3, -0.3, 24), iso(-0.3, -0.3, 24)])} className="pg-seat-back" />
-          <polygon points={poly([iso(-0.3, -0.3, 0), iso(-0.3, 0.3, 0), iso(-0.3, 0.3, 10), iso(-0.3, -0.3, 10)])} className="pg-seat-side" />
-          <polygon points={poly([iso(-0.3, 0.3, 0), iso(0.3, 0.3, 0), iso(0.3, 0.3, 10), iso(-0.3, 0.3, 10)])} className="pg-seat-front" />
-        </g>
-      );
     case "table":
       return (
-        <g transform={`translate(${c.x} ${c.y})`} className="pg-piece">
+        <g transform={`translate(${c.x} ${c.y})`} className="pg-piece" data-piece-cell={`${x},${y}`}>
           <polygon points={poly([iso(-0.4, -0.4, 16), iso(0.4, -0.4, 16), iso(0.4, 0.4, 16), iso(-0.4, 0.4, 16)])} className="pg-wood" />
           <polygon points={poly([iso(-0.4, 0.4, 16), iso(0.4, 0.4, 16), iso(0.4, 0.4, 13), iso(-0.4, 0.4, 13)])} className="pg-wood-dark" />
           <polygon points={poly([iso(0.4, -0.4, 16), iso(0.4, 0.4, 16), iso(0.4, 0.4, 13), iso(0.4, -0.4, 13)])} className="pg-wood-dark" />
@@ -311,19 +320,9 @@ export function PieceGlyph({ kind, x, y }: { kind: PieceKind; x: number; y: numb
           <line x1={iso(0.32, 0.32).x} y1={iso(0.32, 0.32).y} x2={iso(0.32, 0.32, 13).x} y2={iso(0.32, 0.32, 13).y} className="pg-leg" />
         </g>
       );
-    case "shelf":
-      return (
-        <g transform={`translate(${c.x} ${c.y})`} className="pg-piece">
-          <polygon points={poly([iso(-0.4, -0.4, 0), iso(0.4, -0.4, 0), iso(0.4, -0.4, 30), iso(-0.4, -0.4, 30)])} className="pg-wood" />
-          <polygon points={poly([iso(0.4, -0.4, 0), iso(0.4, 0.1, 0), iso(0.4, 0.1, 30), iso(0.4, -0.4, 30)])} className="pg-wood-dark" />
-          <polygon points={poly([iso(-0.4, -0.4, 30), iso(0.4, -0.4, 30), iso(0.4, 0.1, 30), iso(-0.4, 0.1, 30)])} className="pg-wood-light" />
-          <line x1={iso(-0.4, -0.4, 10).x} y1={iso(-0.4, -0.4, 10).y} x2={iso(0.4, -0.4, 10).x} y2={iso(0.4, -0.4, 10).y} className="pg-leg" />
-          <line x1={iso(-0.4, -0.4, 20).x} y1={iso(-0.4, -0.4, 20).y} x2={iso(0.4, -0.4, 20).x} y2={iso(0.4, -0.4, 20).y} className="pg-leg" />
-        </g>
-      );
     case "hearth":
       return (
-        <g transform={`translate(${c.x} ${c.y})`} className="pg-piece">
+        <g transform={`translate(${c.x} ${c.y})`} className="pg-piece" data-piece-cell={`${x},${y}`}>
           <polygon points={poly([iso(-0.4, -0.4, 0), iso(0.4, -0.4, 0), iso(0.4, 0.4, 0), iso(-0.4, 0.4, 0)])} className="pg-stone" />
           <polygon points={poly([iso(-0.3, -0.3, 0), iso(0.3, -0.3, 0), iso(0.3, 0.3, 0), iso(-0.3, 0.3, 0)])} className="pg-ember" />
           <path d={`M ${iso(0, 0, 4).x} ${iso(0, 0, 4).y} q -6 -8 0 -16 q 6 8 0 16`} className="pg-flame" />
@@ -332,7 +331,7 @@ export function PieceGlyph({ kind, x, y }: { kind: PieceKind; x: number; y: numb
       );
     case "plant":
       return (
-        <g transform={`translate(${c.x} ${c.y})`} className="pg-piece">
+        <g transform={`translate(${c.x} ${c.y})`} className="pg-piece" data-piece-cell={`${x},${y}`}>
           <polygon points={poly([iso(-0.18, -0.18, 0), iso(0.18, -0.18, 0), iso(0.18, 0.18, 0), iso(-0.18, 0.18, 0)])} className="pg-pot" />
           <polygon points={poly([iso(-0.18, 0.18, 0), iso(0.18, 0.18, 0), iso(0.18, 0.18, 7), iso(-0.18, 0.18, 7)])} className="pg-pot" />
           <circle cx={0} cy={-14} r={7} className="pg-leaf" />
@@ -342,7 +341,7 @@ export function PieceGlyph({ kind, x, y }: { kind: PieceKind; x: number; y: numb
       );
     case "tree":
       return (
-        <g transform={`translate(${c.x} ${c.y})`} className="pg-piece">
+        <g transform={`translate(${c.x} ${c.y})`} className="pg-piece" data-piece-cell={`${x},${y}`}>
           <line x1={0} y1={0} x2={0} y2={-26} className="pg-trunk" />
           <circle cx={0} cy={-36} r={16} className="pg-canopy" />
           <circle cx={-10} cy={-28} r={11} className="pg-canopy-2" />
@@ -351,21 +350,10 @@ export function PieceGlyph({ kind, x, y }: { kind: PieceKind; x: number; y: numb
       );
     case "path":
       return (
-        <g transform={`translate(${c.x} ${c.y})`} className="pg-piece">
+        <g transform={`translate(${c.x} ${c.y})`} className="pg-piece" data-piece-cell={`${x},${y}`}>
           <ellipse cx={-8} cy={-2} rx={7} ry={3.5} className="pg-stone" />
           <ellipse cx={7} cy={3} rx={7} ry={3.5} className="pg-stone" />
           <ellipse cx={2} cy={-6} rx={5} ry={2.5} className="pg-stone" />
-        </g>
-      );
-    case "gate":
-      return (
-        <g transform={`translate(${c.x} ${c.y})`} className="pg-piece">
-          <line x1={-14} y1={4} x2={-14} y2={-26} className="pg-post" />
-          <line x1={14} y1={-4} x2={14} y2={-34} className="pg-post" />
-          <line x1={-14} y1={-24} x2={14} y2={-32} className="pg-post" />
-          <line x1={-8} y1={-8} x2={-8} y2={-20} className="pg-picket" />
-          <line x1={0} y1={-10} x2={0} y2={-22} className="pg-picket" />
-          <line x1={8} y1={-12} x2={8} y2={-24} className="pg-picket" />
         </g>
       );
     default:
