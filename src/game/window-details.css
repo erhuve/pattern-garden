@@ -1,0 +1,27 @@
+.pg-door-panel {
+  fill: none;
+  stroke: var(--pg-wood-dark);
+  stroke-width: 0.7;
+}
+.pg-door-knob {
+  fill: #f5dfa3;
+  stroke: var(--pg-wood-dark);
+  stroke-width: 0.4;
+}
+.pg-window-sill {
+  fill: none;
+  stroke: var(--pg-plaster);
+  stroke-width: 3;
+  stroke-linecap: square;
+}
+.pg-sill-pot {
+  fill: var(--pg-clay);
+  stroke: var(--pg-wood-dark);
+  stroke-width: 0.5;
+}
+.pg-sill-leaf {
+  fill: var(--pg-moss);
+}
+.pg-sill {
+  pointer-events: visiblePainted;
+}

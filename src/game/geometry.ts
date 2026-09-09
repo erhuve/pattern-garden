@@ -141,12 +141,25 @@ export function pathTurns(path: Cell[]): number {
   return turns;
 }
 
-export type PlaceTarget = { type: "cell"; x: number; y: number } | { type: "wall"; side: Side; pos: number };
+export type PlaceTarget = { type: "cell"; x: number; y: number } | { type: "wall"; side: Side; pos: number } | { type: "sill"; side: Side; pos: number };
+
+export function usedInventory(pieces: Piece[], kind: PieceKind): number {
+  return pieces.filter((p) => p.kind === kind).length + (kind === "plant" ? pieces.filter((p) => p.kind === "window" && p.sillPlant === true).length : 0);
+}
 
 const OUTDOOR_KINDS = new Set<PieceKind>(["tree", "path", "gate"]);
 const INDOOR_KINDS = new Set<PieceKind>(["seat", "table", "shelf", "hearth"]);
 
 export function placeAt(level: Level, pieces: Piece[], kind: PieceKind, t: PlaceTarget): Piece[] | string {
+  const limit = level.palette.find((entry) => entry.kind === kind)?.max ?? 0;
+  if (kind === "plant" && usedInventory(pieces, kind) >= limit) return "All your plants are already placed.";
+  if (kind === "plant" && t.type !== "cell") {
+    const window = pieces.find((p) => p.kind === "window" && p.side === t.side && p.pos === t.pos);
+    if (!window || window.kind !== "window") return "Put a plant on a floor tile or an existing window sill.";
+    if (window.sillPlant) return "There is already a plant on this sill.";
+    return pieces.map((p) => p === window ? { ...window, sillPlant: true } : p);
+  }
+  if (t.type === "sill") return "Only a plant goes on a window sill.";
   if (t.type === "wall") {
     if (!isWallKind(kind)) return "That piece belongs on the floor.";
     if (t.pos < 0 || t.pos >= wallLength(level.room, t.side)) return "That is not part of the room's wall.";
@@ -166,6 +179,13 @@ export function placeAt(level: Level, pieces: Piece[], kind: PieceKind, t: Place
 }
 
 export function removeAt(level: Level, pieces: Piece[], t: PlaceTarget): Piece[] {
+  if (t.type === "sill") {
+    return pieces.map((p) => {
+      if (p.kind !== "window" || p.side !== t.side || p.pos !== t.pos) return p;
+      const { sillPlant: _plant, ...window } = p;
+      return window;
+    });
+  }
   if (t.type === "wall") {
     const wall = pieces.find((piece) => isWallPiece(piece) && piece.side === t.side && piece.pos === t.pos);
     const attachedCell = wall?.kind === "alcove" ? alcoveCell(level.room, wall) : null;

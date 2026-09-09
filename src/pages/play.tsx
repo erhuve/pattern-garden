@@ -9,7 +9,7 @@ import type { BoardTool, Cell, Layout, Piece } from "@/game/types";
 import { OrientationControls } from "@/game/OrientationControls";
 import { isDirectional, setFacing } from "@/game/orientation";
 import { PIECE_LABELS, WALL_KINDS } from "@/game/types";
-import { placeAt, removeAt } from "@/game/geometry";
+import { placeAt, removeAt, usedInventory } from "@/game/geometry";
 import { retarget, spawn, step, type Inhabitant } from "@/game/inhabitants";
 import { useProgress } from "@/game/progress";
 import { PATTERNS } from "@/game/patterns";
@@ -41,7 +41,7 @@ function PlayLevel({ idx }: { idx: number }) {
   const [tool, setTool] = useState<BoardTool | null>(level.palette[0]?.kind ?? null);
   const [showLight, setShowLight] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
-  const [dialog, setDialog] = useState<{ kind: "about" } | { kind: "check"; id: string } | { kind: "orientation"; cell: Cell } | { kind: "objects" } | null>(null);
+  const [dialog, setDialog] = useState<{ kind: "about" } | { kind: "check"; id: string } | { kind: "orientation"; cell: Cell } | { kind: "objects" } | { kind: "remove-window"; target: Extract<Target, { type: "wall" }> } | null>(null);
   const [people, setPeople] = useState<Inhabitant[]>(() => spawn({ world: level.world, room: level.room, pieces: [] }, level.inhabitants));
 
   const layout: Layout = { world: level.world, room: level.room, pieces };
@@ -95,7 +95,9 @@ function PlayLevel({ idx }: { idx: number }) {
       return;
     }
     if (tool === "erase") {
-      setPieces((ps) => removeAt(level, ps, t));
+      if (t.type !== "cell" && pieces.some((p) => p.kind === "window" && p.sillPlant && p.side === t.side && p.pos === t.pos)) {
+        setDialog({ kind: "remove-window", target: { type: "wall", side: t.side, pos: t.pos } });
+      } else setPieces((ps) => removeAt(level, ps, t));
       return;
     }
     const entry = level.palette.find((p) => p.kind === tool);
@@ -105,11 +107,11 @@ function PlayLevel({ idx }: { idx: number }) {
       setMessage(`${PIECE_LABELS[tool]} goes on a wall — tap the edge of the room.`);
       return;
     }
-    if (!wallKind && t.type !== "cell") {
+    if (!wallKind && tool !== "plant" && t.type !== "cell") {
       setMessage(`${PIECE_LABELS[tool]} goes on the floor — tap a tile inside the room.`);
       return;
     }
-    if (pieces.filter((piece) => piece.kind === tool).length >= entry.max) {
+    if (usedInventory(pieces, tool) >= entry.max) {
       setMessage(`You only have ${entry.max} ${PIECE_LABELS[tool].toLowerCase()}${entry.max === 1 ? "" : "s"} for this place.`);
       return;
     }
@@ -164,8 +166,14 @@ function PlayLevel({ idx }: { idx: number }) {
           onNext={next ? () => navigate(`/play/${next.slug}`) : undefined}
           onExplain={(check) => setDialog({ kind: "check", id: check.id })} />
       </div>
-      <PlayDialog open={dialog !== null} onClose={() => setDialog(null)} title={dialog?.kind === "objects" ? "Choose a piece to turn" : orientedPiece ? `Turn ${PIECE_LABELS[orientedPiece.kind].toLowerCase()}` : explainedCheck?.label ?? "About this pattern"}>
-        {dialog?.kind === "objects" ? (
+      <PlayDialog open={dialog !== null} onClose={() => setDialog(null)} title={dialog?.kind === "remove-window" ? "Remove from this window" : dialog?.kind === "objects" ? "Choose a piece to turn" : orientedPiece ? `Turn ${PIECE_LABELS[orientedPiece.kind].toLowerCase()}` : explainedCheck?.label ?? "About this pattern"}>
+        {dialog?.kind === "remove-window" ? (
+          <div className="pg-object-chooser">
+            <p>Keep the window and remove its plant, or remove both.</p>
+            <button type="button" onClick={() => { setPieces((ps) => removeAt(level, ps, { ...dialog.target, type: "sill" })); setDialog(null); }}>Remove plant only</button>
+            <button type="button" onClick={() => { setPieces((ps) => removeAt(level, ps, dialog.target)); setDialog(null); }}>Remove window and plant</button>
+          </div>
+        ) : dialog?.kind === "objects" ? (
           <div className="pg-object-chooser">
             <p>Choose a piece below, or close this panel and tap one on the board. Auto is the default; fixed directions are optional.</p>
             {pieces.filter(isDirectional).sort((a, b) => a.y - b.y || a.x - b.x).map((piece) => (

@@ -41,6 +41,16 @@ This is a **Zo Site** - a web application running on a user's Zo computer that c
 - **Frontend**: React + Vite with client-side routing, shadcn/ui components, and Tailwind CSS 4
 - **Single Process**: Vite runs in middleware mode (no separate dev server)
 
+## Window places, room size and doors
+
+Window Place now requires a seat directly beside glazing, side enclosure, and an accessible opening. `window-place.ts` checks a solid side wall or a shelf on a cardinal tile alongside the window (not a diagonal shelf, a low table, or furniture behind the seat). Each window seat must have a free cardinal route to an unoccupied interior floor cell; boxed-in seats fail even if they have enclosure. Plants and extra windows are optional. The four criteria total 100 points; saved best scores remain historical while current completion is reevaluated from the layout.
+
+Select Plant and tap existing window glass or its sill to attach a planter. Windows store optional `sillPlant: true`; the chair's floor cell remains free. `usedInventory` counts floor plants and attached planters against the same palette limit. With Remove selected, tap anywhere on a planted window to choose “Remove plant only” or “Remove window and plant.” The two large buttons avoid requiring precise leaf taps on phones; closing or pressing Escape changes nothing. Both inventory items are returned when removing the whole window. The optional attachment is compatible with version-2 saves, so no migration or relocation of existing floor plants is needed. Reset clears attachments with the rest of the level. Other plant placements remain available.
+
+Sitting Circle uses a 7×6 room (42 floor cells, previously 5×4) in an 11×10 world. Its origin and saved floor coordinates are unchanged; wall pieces stay anchored to their side and offset on the expanded boundary. No existing furniture is deleted or moved. Its six-seat completion criteria and two-cell gathering radius are unchanged. Alcoves and the other room dimensions are unchanged.
+
+Doors remain full height on every wall, including cutaway front walls. Their frame, two panels, knob and full-height hit surface stay aligned; neighboring front walls remain low. Window sills and door details use `window-details.css`. Direct wall targeting prevents taps on the door's upper half from erasing a floor item behind it. Board actions commit on click after a valid pointer gesture, so opening a dialog cannot redirect the same gesture's click onto a destructive dialog button. Dialog dismissal restores focus to the initiating control or active palette tool.
+
 ## Object orientation
 
 Seats, bookshelves and gates choose a direction automatically from the current layout. `src/game/orientation.ts` is a pure resolver: final-layout geometry, not insertion order, timers or inhabitants, determines orientation. Missing `CellPiece.facing` means Auto; only deliberate fixed directions are saved. Existing layouts need no orientation migration and retain their coordinates, inventory, scores and completion state.
@@ -70,6 +80,7 @@ bun run build
 python3 tests/play_layout.py --build-dir dist
 python3 tests/completion_celebration.py --build-dir dist
 python3 tests/orientation.py --build-dir dist
+python3 tests/window_details.py --build-dir dist
 python3 tests/glyph_occlusion.py
 ```
 

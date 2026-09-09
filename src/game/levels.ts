@@ -1,4 +1,5 @@
 import type { Cell, CheckResult, Evaluation, Layout, Level, Rect, Side, WallPiece } from "./types";
+import { windowNook } from "./window-place";
 import {
   cellPieces,
   alcoveCell,
@@ -178,20 +179,16 @@ const windowPlace: Level = {
     const wins = wallPieces(layout).filter((p) => p.kind === "window");
     const seats = cellPieces(layout).filter((p) => p.kind === "seat");
     const windowSeats = seats.filter((s) => wins.some((w) => sameCell(interiorCell(room, w), s)));
-    const isCorner = (c: Cell) =>
-      (c.x === room.x || c.x === room.x + room.w - 1) && (c.y === room.y || c.y === room.y + room.h - 1);
-    const furniture = cellPieces(layout).filter((p) => p.kind === "shelf" || p.kind === "table");
-    const enclosed = windowSeats.filter((s) => isCorner(s) || furniture.some((f) => chebyshev(f, s) === 1));
-    const paired = windowSeats.filter((s) => wins.filter((w) => chebyshev(interiorCell(room, w), s) <= 1).length >= 2);
-    const green = windowSeats.filter((s) => cellPieces(layout).some((p) => p.kind === "plant" && chebyshev(p, s) === 1));
+    const nooks = windowSeats.map((s) => windowNook(layout, s));
+    const enclosed = nooks.filter((nook) => nook.enclosed);
+    const accessible = nooks.filter((nook) => nook.accessible);
     const anySeat = windowSeats.length > 0;
     return {
       checks: [
         check("window", "A window to sit in", 10, wins.length > 0, wins.length > 0 ? "There is daylight to gather around." : "Cut a window first."),
-        check("seat", "A seat pulled right up to the glass", 35, anySeat, anySeat ? "Someone can sit with the sky at their shoulder." : "Put a seat in the cell directly inside a window."),
-        check("enclosure", "The window place is its own nook", 25, anySeat ? enclosed.length / windowSeats.length : 0, enclosed.length > 0 ? "A corner or a shelf wraps the seat and makes it a place." : "Tuck the seat into a corner or flank it with a shelf or table."),
-        check("wrap", "Glass wraps around the seat", 15, anySeat ? paired.length / windowSeats.length : 0, paired.length > 0 ? "Two panes make a bay." : "A second window beside the first turns a seat into a bay."),
-        check("green", "Something growing at the sill", 15, anySeat ? green.length / windowSeats.length : 0, green.length > 0 ? "Leaves catch the light next to the seat." : "A plant by the seat softens the edge."),
+        check("seat", "A seat pulled right up to the glass", 40, anySeat, anySeat ? "Someone can sit beside the glass. Extra windows and plants are optional; tap a window with Plant selected to plant its sill." : "Put a seat in the cell directly inside a window. Extra glazing and plants are optional."),
+        check("enclosure", "A sheltered side makes a nook", 25, anySeat ? enclosed.length / windowSeats.length : 0, anySeat && enclosed.length === windowSeats.length ? "Every window seat has a solid wall or shelf at its side." : "Give each window seat a solid side wall or an immediately adjacent shelf alongside the window. A diagonal shelf or a low table does not enclose it."),
+        check("access", "An open way into the room", 25, anySeat ? accessible.length / windowSeats.length : 0, anySeat && accessible.length === windowSeats.length ? "Each nook opens onto a clear floor route to the room's interior." : "Leave an empty neighboring tile and a clear floor route to the middle of the room. Do not box the chair in."),
       ],
       attractors: windowSeats,
     };
@@ -251,8 +248,8 @@ const sittingCircle: Level = {
     "A group of chairs, a sofa and a chair, a pile of cushions — these are the most obvious things in everybody's life — and yet to make them work, so people become animated and alive in them, is a very subtle business.",
   completeLine: "The circle tightens and loosens as the evening goes on.",
   inhabitants: 5,
-  world: { w: 9, h: 8 },
-  room: { x: 2, y: 2, w: 5, h: 4 },
+  world: { w: 11, h: 10 },
+  room: { x: 2, y: 2, w: 7, h: 6 },
   palette: [
     { kind: "hearth", max: 1 },
     { kind: "seat", max: 8 },

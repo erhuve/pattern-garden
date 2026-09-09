@@ -2,11 +2,12 @@ import { useMemo, useRef, useState } from "react";
 import type { BoardTool, Cell, Evaluation, Layout, Level, PieceKind, Side, WallPiece } from "./types";
 import { DirectionalGlyph } from "./DirectionalGlyph";
 import { resolveFacing } from "./orientation";
-import { alcoveAt, interiorCell, wallLength } from "./geometry";
+import { alcoveAt, interiorCell, wallLength, type PlaceTarget } from "./geometry";
+import "./window-details.css";
 import { lightCount } from "./levels";
 import type { Inhabitant } from "./inhabitants";
 
-export type Target = { type: "cell"; x: number; y: number } | { type: "wall"; side: Side; pos: number };
+export type Target = PlaceTarget;
 
 const TW = 60;
 const TH = 30;
@@ -118,7 +119,7 @@ export function Board({ level, layout, evaluation, people, tool, onTarget, showL
   const wallTool = tool === "window" || tool === "door" || tool === "alcove";
   const svgRef = useRef<SVGSVGElement>(null);
 
-  function toSvgPoint(e: React.PointerEvent): P | null {
+  function toSvgPoint(e: React.MouseEvent): P | null {
     const svg = svgRef.current;
     if (!svg) return null;
     const ctm = svg.getScreenCTM();
@@ -134,7 +135,8 @@ export function Board({ level, layout, evaluation, people, tool, onTarget, showL
     let best: { seg: WallSeg; d: number } | null = null;
     for (const seg of segs) {
       if (onlyWithPiece && !wallMap.has(`${seg.side}${seg.pos}`)) continue;
-      const h = Math.max(seg.front ? KNEE_H : WALL_H, 30);
+      const piece = wallMap.get(`${seg.side}${seg.pos}`);
+      const h = piece?.kind === "door" ? WALL_H : Math.max(seg.front ? KNEE_H : WALL_H, 30);
       const d = polyDist(pt, facePoly(seg, h));
       if (!best || d < best.d) best = { seg, d };
     }
@@ -167,14 +169,23 @@ export function Board({ level, layout, evaluation, people, tool, onTarget, showL
 
   const downAt = useRef<{ x: number; y: number } | null>(null);
 
-  function handlePointer(e: React.PointerEvent<SVGSVGElement>, commit: boolean) {
+  function handlePointer(e: React.MouseEvent<SVGSVGElement>, commit: boolean) {
     const pt = toSvgPoint(e);
     if (!pt) return;
-    const element = e.target instanceof Element ? e.target : null;
+    const hit = document.elementFromPoint(e.clientX, e.clientY);
+    const element = hit && e.currentTarget.contains(hit) ? hit : null;
+    if (!element) return;
     const paintedPiece = tool === "rotate" ? element?.closest<SVGGElement>("[data-piece-cell]") : null;
-    const paintedWall = tool === "rotate" && !element?.classList.contains("pg-floor") ? element?.closest("[data-wall-surface]") : null;
+    const paintedWall = !element?.classList.contains("pg-floor") ? element?.closest<SVGGElement>("[data-wall-surface]") : null;
+    const wallKey = paintedWall?.dataset.wallSurface;
+    const directWall: Target | null = wallKey ? { type: "wall", side: wallKey[0] as Side, pos: Number(wallKey.slice(1)) } : null;
+    const sillPlant = element?.closest("[data-sill-plant]");
     const cell = paintedPiece?.dataset.pieceCell?.split(",").map(Number);
-    const t: Target | null = cell ? { type: "cell", x: cell[0], y: cell[1] } : paintedWall ? null : resolveTarget(pt);
+    const t: Target | null = tool === "rotate"
+      ? cell ? { type: "cell", x: cell[0], y: cell[1] } : paintedWall ? null : resolveTarget(pt)
+      : directWall && (wallTool || tool === "plant" || tool === "erase" || paintedWall?.querySelector("[data-full-door]"))
+        ? tool === "erase" && sillPlant ? { ...directWall, type: "sill" } : directWall
+        : resolveTarget(pt);
     setHover(t);
     if (commit && t) onTarget(t);
   }
@@ -209,8 +220,8 @@ export function Board({ level, layout, evaluation, people, tool, onTarget, showL
 
   function renderWall(seg: WallSeg) {
     const piece = wallMap.get(`${seg.side}${seg.pos}`);
-    const h = seg.front ? KNEE_H : WALL_H;
-    const hovered = isHoverWall(seg.side, seg.pos) && (wallTool || tool === "erase");
+    const h = piece?.kind === "door" ? WALL_H : seg.front ? KNEE_H : WALL_H;
+    const hovered = isHoverWall(seg.side, seg.pos) && (wallTool || tool === "erase" || tool === "plant" && piece?.kind === "window");
     const mid = { x: (seg.a.x + seg.b.x) / 2, y: (seg.a.y + seg.b.y) / 2 };
     const dir = { x: seg.b.x - seg.a.x, y: seg.b.y - seg.a.y };
     const lerp = (t: number, z: number): P => ({ x: seg.a.x + dir.x * t, y: seg.a.y + dir.y * t - z });
@@ -218,12 +229,15 @@ export function Board({ level, layout, evaluation, people, tool, onTarget, showL
     return (
       <g key={`w${seg.side}${seg.pos}`} className="pg-wallseg" data-wall-surface={`${seg.side}${seg.pos}`}>
         {piece?.kind === "door" ? (
-          <>
-            <polygon points={poly([seg.a, lerp(0.2, 0), lerp(0.2, h), lerp(0, h)])} className={shade} />
-            <polygon points={poly([lerp(0.8, 0), seg.b, lerp(1, h), lerp(0.8, h)])} className={shade} />
-            <polygon points={poly([lerp(0.2, h * 0.82), lerp(0.8, h * 0.82), lerp(0.8, h), lerp(0.2, h)])} className={shade} />
-            <polygon points={poly([lerp(0.22, 0), lerp(0.78, 0), lerp(0.78, seg.front ? h : WALL_H * 0.8), lerp(0.22, seg.front ? h : WALL_H * 0.8)])} className="pg-door" />
-          </>
+          <g data-full-door={`${seg.side}${seg.pos}`}>
+            <polygon points={poly([seg.a, lerp(0.18, 0), lerp(0.18, h), lerp(0, h)])} className={shade} />
+            <polygon points={poly([lerp(0.82, 0), seg.b, lerp(1, h), lerp(0.82, h)])} className={shade} />
+            <polygon points={poly([lerp(0.18, h - 5), lerp(0.82, h - 5), lerp(0.82, h), lerp(0.18, h)])} className={shade} />
+            <polygon points={poly([lerp(0.2, 1), lerp(0.8, 1), lerp(0.8, h - 5), lerp(0.2, h - 5)])} className="pg-door" />
+            <polygon points={poly([lerp(0.29, 23), lerp(0.71, 23), lerp(0.71, h - 10), lerp(0.29, h - 10)])} className="pg-door-panel" />
+            <polygon points={poly([lerp(0.29, 6), lerp(0.71, 6), lerp(0.71, 17), lerp(0.29, 17)])} className="pg-door-panel" />
+            <circle cx={lerp(0.71, 20).x} cy={lerp(0.71, 20).y} r={1.6} className="pg-door-knob" />
+          </g>
         ) : piece?.kind === "alcove" ? (
           <AlcoveBay seg={seg} h={h} shade={shade} />
         ) : (
@@ -243,6 +257,15 @@ export function Board({ level, layout, evaluation, people, tool, onTarget, showL
           className={`pg-wall-hit ${hovered ? "is-hover" : ""}`}
           data-wall={`${seg.side}${seg.pos}`}
         />
+        {piece?.kind === "window" && <g className="pg-sill" data-sill={`${seg.side}${seg.pos}`}>
+          <polyline points={poly([lerp(0.15, seg.front ? h : 14), lerp(0.85, seg.front ? h : 14)])} className="pg-window-sill" />
+          {piece.sillPlant && <g data-sill-plant={`${seg.side}${seg.pos}`} transform={`translate(${lerp(0.5, seg.front ? h : 14).x} ${lerp(0.5, seg.front ? h : 14).y})`}>
+            <polygon points="-6,-5 6,-5 4,0 -4,0" className="pg-sill-pot" />
+            <ellipse cx={0} cy={-10} rx={3.3} ry={5.5} className="pg-sill-leaf" />
+            <ellipse cx={-4} cy={-8} rx={3.5} ry={2.8} className="pg-sill-leaf" />
+            <ellipse cx={4} cy={-8} rx={3.5} ry={2.8} className="pg-sill-leaf" />
+          </g>}
+        </g>}
         {hovered && <circle cx={mid.x} cy={mid.y - h / 2} r={3} className="pg-hover-dot" />}
       </g>
     );
@@ -256,6 +279,8 @@ export function Board({ level, layout, evaluation, people, tool, onTarget, showL
       role="img"
       aria-label={`${level.title} board`}
       onPointerMove={(e) => {
+        const d = downAt.current;
+        if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 12) downAt.current = null;
         if (e.pointerType === "mouse") handlePointer(e, false);
       }}
       onPointerLeave={() => setHover(null)}
@@ -264,6 +289,10 @@ export function Board({ level, layout, evaluation, people, tool, onTarget, showL
         downAt.current = { x: e.clientX, y: e.clientY };
       }}
       onPointerUp={(e) => {
+        const d = downAt.current;
+        if (!d || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 12) downAt.current = null;
+      }}
+      onClick={(e) => {
         const d = downAt.current;
         downAt.current = null;
         if (!d || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 12) return;

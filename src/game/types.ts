@@ -12,7 +12,9 @@ export type CellPieceKind =
   | "shelf";
 export type PieceKind = WallPieceKind | CellPieceKind;
 
-export type WallPiece = { kind: WallPieceKind; side: Side; pos: number };
+export type WallPiece =
+  | { kind: "window"; side: Side; pos: number; sillPlant?: true }
+  | { kind: "door" | "alcove"; side: Side; pos: number };
 export type CellPiece = { kind: CellPieceKind; x: number; y: number; facing?: Side };
 export type BoardTool = PieceKind | "erase" | "rotate";
 export type Piece = WallPiece | CellPiece;

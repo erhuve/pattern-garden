@@ -3,15 +3,25 @@ import { ArrowRight, Check, ChevronRight, Eraser, Info, Lightbulb, RotateCcw, Ro
 import type { BoardTool, CheckResult, Evaluation, Level, Piece } from "./types";
 import { PIECE_LABELS, WALL_KINDS } from "./types";
 import { PieceIcon } from "./PieceIcon";
+import { usedInventory } from "./geometry";
 
 export function PlayDialog({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const returnFocus = useRef<HTMLElement | null>(null);
   useEffect(() => {
     const dialog = ref.current;
     if (open && dialog && !dialog.open) {
+      const active = document.activeElement;
+      returnFocus.current = active instanceof HTMLElement && active !== document.body && !dialog.contains(active)
+        ? active : document.querySelector<HTMLElement>(".pg-board-palette .is-active");
       dialog.showModal();
       dialog.querySelector<HTMLButtonElement>("button")?.focus();
-    } else if (!open && dialog?.open) dialog.close();
+    } else if (!open) {
+      if (dialog?.open) dialog.close();
+      const target = returnFocus.current;
+      returnFocus.current = null;
+      if (target?.isConnected) target.focus({ preventScroll: true });
+    }
   }, [open]);
   useEffect(() => {
     if (open && ref.current?.open) ref.current.querySelector<HTMLButtonElement>("button")?.focus();
@@ -107,13 +117,14 @@ export function BoardTools({ level, pieces, tool, onTool, showLight, onLight, on
     <>
       <div className="pg-board-palette" role="group" aria-label="Building pieces. Counts show used inventory; extras are optional." style={{ ["--piece-total" as string]: level.palette.length + 2 }}>
         {level.palette.map((entry) => {
-          const used = pieces.filter((piece) => piece.kind === entry.kind).length;
+          const used = usedInventory(pieces, entry.kind);
+          const surface = entry.kind === "plant" ? "floor or window sill" : WALL_KINDS.has(entry.kind) ? "wall" : "floor";
           return (
             <button key={entry.kind} type="button"
               className={`pg-tool pg-piece-tile ${tool === entry.kind ? "is-active" : ""} ${used >= entry.max ? "is-spent" : ""}`}
               onClick={() => onTool(entry.kind)} aria-pressed={tool === entry.kind}
-              title={`${PIECE_LABELS[entry.kind]} · ${used}/${entry.max} used · ${WALL_KINDS.has(entry.kind) ? "Wall" : "Floor"}`}
-              aria-label={`${PIECE_LABELS[entry.kind]}, ${used} of ${entry.max} used, place on ${WALL_KINDS.has(entry.kind) ? "wall" : "floor"}`}>
+              title={`${PIECE_LABELS[entry.kind]} · ${used}/${entry.max} used · ${surface}`}
+              aria-label={`${PIECE_LABELS[entry.kind]}, ${used} of ${entry.max} used, place on ${surface}`}>
               <PieceIcon kind={entry.kind} />
               <span className="pg-tool-count" aria-hidden="true">{used}/{entry.max}</span>
             </button>
@@ -126,7 +137,7 @@ export function BoardTools({ level, pieces, tool, onTool, showLight, onLight, on
       </div>
       <p className="pg-placement-hint" aria-live="polite" aria-atomic="true">
         <strong>{tool === "rotate" ? "Rotate" : tool === "erase" ? "Remove" : tool ? PIECE_LABELS[tool] : "Select a piece"}</strong>
-        <span>{tool === "rotate" ? "Tap a seat, shelf or gate" : tool === "erase" ? "Tap a piece" : tool && WALL_KINDS.has(tool) ? "Tap a wall" : "Tap a floor tile"}</span>
+        <span>{tool === "rotate" ? "Tap a seat, shelf or gate" : tool === "erase" ? "Tap a piece; planted windows give you a choice" : tool === "plant" ? "Tap a window sill or a floor tile" : tool && WALL_KINDS.has(tool) ? "Tap a wall" : "Tap a floor tile"}</span>
       </p>
       <div className="pg-board-actions" role="group" aria-label="Board controls">
         <button type="button" className={`pg-icon-button ${showLight ? "is-on" : ""}`} onClick={onLight} aria-pressed={showLight} aria-label="Daylight" title="Show daylight"><Lightbulb aria-hidden="true" /></button>
