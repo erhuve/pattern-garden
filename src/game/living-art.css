@@ -1,0 +1,128 @@
+.pg-living-glyph,
+.pg-living-glyph *,
+.pg-living-attachment,
+.pg-living-attachment *,
+.pg-living-piece-icon,
+.pg-living-piece-icon * {
+  pointer-events: none;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.pg-living-attachment.is-ghost {
+  opacity: 0.35;
+}
+.pg-lamp-pool {
+  fill: var(--pg-sun, #f2c14e);
+  opacity: 0.24;
+}
+.pg-lamp-pool-core {
+  fill: var(--pg-sun-2, #ffe7a8);
+  opacity: 0.65;
+}
+.pg-lamp-base {
+  fill: var(--pg-clay, #c4643c);
+  stroke: var(--pg-wood-dark, #7d532b);
+  stroke-width: 0.65;
+}
+.pg-lamp-stem,
+.pg-lamp-cord {
+  fill: none;
+  stroke: var(--pg-wood-dark, #7d532b);
+  stroke-width: 0.85;
+}
+.pg-lamp-ceiling-cap {
+  fill: var(--pg-wood-dark, #7d532b);
+}
+.pg-lamp-shade {
+  fill: #e9b867;
+  stroke: var(--pg-wood-dark, #7d532b);
+  stroke-width: 0.65;
+}
+.pg-lamp-shade-fold {
+  fill: none;
+  stroke: var(--pg-sun-2, #ffe7a8);
+  stroke-width: 0.8;
+  opacity: 0.6;
+}
+.pg-lamp-shade-top {
+  fill: var(--pg-wood-light, #c8955e);
+}
+.pg-lamp-light {
+  fill: var(--pg-sun-2, #ffe7a8);
+  stroke: var(--pg-wood-light, #c8955e);
+  stroke-width: 0.45;
+}
+.pg-lamp-bulb {
+  fill: #fff5d4;
+}
+.pg-trellis-post {
+  fill: var(--pg-wood-light, #c8955e);
+}
+.pg-trellis-post-side {
+  fill: var(--pg-wood-dark, #7d532b);
+}
+.pg-trellis-roof-wash {
+  fill: var(--pg-wood-light, #c8955e);
+  opacity: 0.06;
+}
+.pg-trellis-beam-back,
+.pg-trellis-beam-front,
+.pg-trellis-lattice polyline {
+  fill: none;
+}
+.pg-trellis-beam-back {
+  stroke: var(--pg-wood, #a9743f);
+  stroke-width: 1.8;
+}
+.pg-trellis-beam-front {
+  stroke: var(--pg-wood-light, #c8955e);
+  stroke-width: 2;
+}
+.pg-trellis-lattice {
+  opacity: 0.42;
+}
+.pg-trellis-lattice polyline {
+  stroke: var(--pg-wood, #a9743f);
+  stroke-width: 1.15;
+}
+.pg-trellis-vine-stem {
+  fill: none;
+  stroke: var(--pg-moss, #5f7a4a);
+  stroke-width: 0.85;
+}
+.pg-trellis-leaf {
+  fill: var(--pg-moss, #5f7a4a);
+}
+.pg-trellis-leaf-light {
+  fill: var(--pg-moss-2, #8aa36f);
+}
+.pg-trellis-leaf-vein {
+  fill: none;
+  stroke: var(--pg-grass, #a8b98a);
+  stroke-width: 0.4;
+  opacity: 0.65;
+}
+.pg-trellis-roof-foliage {
+  opacity: 0.85;
+}
+.pg-living-path-hint {
+  fill: var(--pg-stone, #b7ad9c);
+  stroke: var(--pg-ink-3, #8a8073);
+  stroke-width: 0.5;
+}
+.pg-living-table-hint {
+  opacity: 0.55;
+}
+.pg-living-table-top {
+  fill: var(--pg-wood-light, #c8955e);
+  stroke: var(--pg-wood-dark, #7d532b);
+  stroke-width: 0.6;
+}
+.pg-living-table-edge {
+  fill: var(--pg-wood, #a9743f);
+}
+.pg-living-table-legs {
+  fill: none;
+  stroke: var(--pg-wood-dark, #7d532b);
+  stroke-width: 1.4;
+}

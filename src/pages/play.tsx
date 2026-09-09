@@ -3,13 +3,15 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ArrowRight, X } from "lucide-react";
 import { Board, type Target } from "@/game/Board";
 import { CompletionCelebration } from "@/game/CompletionCelebration";
+import { CheckDiagnostics } from "@/game/CheckDiagnostics";
 import { BoardTools, CriteriaPanel, PlayDialog } from "@/game/PlayControls";
 import { LEVELS, evaluate } from "@/game/levels";
 import type { BoardTool, Cell, Layout, Piece } from "@/game/types";
 import { OrientationControls } from "@/game/OrientationControls";
 import { isDirectional, setFacing } from "@/game/orientation";
 import { PIECE_LABELS, WALL_KINDS } from "@/game/types";
-import { placeAt, removeAt, usedInventory } from "@/game/geometry";
+import { isFixedTarget, placeAt, removeAt, usedInventory } from "@/game/geometry";
+import { attachmentsAt, removeAttachment } from "@/game/attachments";
 import { retarget, spawn, step, type Inhabitant } from "@/game/inhabitants";
 import { useProgress } from "@/game/progress";
 import { PATTERNS } from "@/game/patterns";
@@ -41,7 +43,8 @@ function PlayLevel({ idx }: { idx: number }) {
   const [tool, setTool] = useState<BoardTool | null>(level.palette[0]?.kind ?? null);
   const [showLight, setShowLight] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
-  const [dialog, setDialog] = useState<{ kind: "about" } | { kind: "check"; id: string } | { kind: "orientation"; cell: Cell } | { kind: "objects" } | { kind: "remove-window"; target: Extract<Target, { type: "wall" }> } | null>(null);
+  const [highlightedCheck, setHighlightedCheck] = useState<string>();
+  const [dialog, setDialog] = useState<{ kind: "about" } | { kind: "check"; id: string } | { kind: "orientation"; cell: Cell } | { kind: "objects" } | { kind: "remove-layers"; cell: Cell } | { kind: "remove-window"; target: Extract<Target, { type: "wall" }> } | null>(null);
   const [people, setPeople] = useState<Inhabitant[]>(() => spawn({ ...level, pieces }, level.inhabitants));
 
   const layout = useMemo<Layout>(() => ({ ...level, pieces }), [level, pieces]);
@@ -96,7 +99,10 @@ function PlayLevel({ idx }: { idx: number }) {
       return;
     }
     if (tool === "erase") {
-      if (t.type !== "cell" && pieces.some((p) => p.kind === "window" && p.sillPlant && p.side === t.side && p.pos === t.pos)) {
+      if (isFixedTarget(level, t)) { setMessage("This doorway is part of the room and stays in place."); return; }
+      if (t.type === "cell" && attachmentsAt(pieces, t).length) {
+        setDialog({ kind: "remove-layers", cell: t });
+      } else if (t.type !== "cell" && pieces.some((p) => p.kind === "window" && p.sillPlant && p.side === t.side && p.pos === t.pos)) {
         setDialog({ kind: "remove-window", target: { type: "wall", side: t.side, pos: t.pos } });
       } else setPieces((ps) => removeAt(level, ps, t));
       return;
@@ -149,7 +155,8 @@ function PlayLevel({ idx }: { idx: number }) {
       <div className="pg-play-grid">
         <section className="pg-stage" aria-label="Building board" style={{ ["--piece-total" as string]: level.palette.length + 2 }}>
           <div className="pg-board-viewport">
-            <Board level={level} layout={layout} evaluation={evaluation} people={people} tool={tool} onTarget={handleTarget} showLight={showLight} />
+            <Board level={level} layout={layout} evaluation={evaluation} people={people} tool={tool} onTarget={handleTarget} showLight={showLight} highlightedCheck={highlightedCheck} />
+            {level.scene && <p className="pg-scene-legend">{level.scene === "garden-seat" ? showLight ? "Afternoon sun from the walk · gold = sun, green = shade" : "Sun map hidden · use the light button to show it" : level.scene === "trellised-walk" ? "Stone → trellis → climbing plant · endpoints already paved" : level.scene === "eating-atmosphere" ? "Attach the lamp over the table · leave room behind each chair" : "Look toward the public garden walk"}{highlightedCheck && <><br />Highlighted tiles: ! needs attention · ✓ met · dotted = guide</>}</p>}
             <CompletionCelebration complete={score === 100} />
           </div>
           <BoardTools level={level} pieces={pieces} tool={tool} onTool={(kind) => { setTool(kind); setMessage(null); if (kind === "rotate") setDialog({ kind: "objects" }); }}
@@ -163,12 +170,20 @@ function PlayLevel({ idx }: { idx: number }) {
             </div>
           )}
         </section>
-        <CriteriaPanel evaluation={evaluation} completeLine={level.completeLine} explainOnTap={Boolean(level.adaptation)}
+        <CriteriaPanel evaluation={evaluation} completeLine={level.completeLine} explainOnTap={Boolean(level.adaptation)} onSelect={(check) => setHighlightedCheck(check.id)}
           onNext={next ? () => navigate(`/play/${next.slug}`) : undefined}
           onExplain={(check) => setDialog({ kind: "check", id: check.id })} />
       </div>
-      <PlayDialog open={dialog !== null} onClose={() => setDialog(null)} title={dialog?.kind === "remove-window" ? "Remove from this window" : dialog?.kind === "objects" ? "Choose a piece to turn" : orientedPiece ? `Turn ${PIECE_LABELS[orientedPiece.kind].toLowerCase()}` : explainedCheck?.label ?? "About this pattern"}>
-        {dialog?.kind === "remove-window" ? (
+      <PlayDialog open={dialog !== null} onClose={() => setDialog(null)} title={dialog?.kind === "remove-layers" ? "Remove a layer" : dialog?.kind === "remove-window" ? "Remove from this window" : dialog?.kind === "objects" ? "Choose a piece to turn" : orientedPiece ? `Turn ${PIECE_LABELS[orientedPiece.kind].toLowerCase()}` : explainedCheck?.label ?? "About this pattern"}>
+        {dialog?.kind === "remove-layers" ? (
+          <div className="pg-object-chooser">
+            <p>Keep the ground piece and remove an attachment, or remove everything on this tile.</p>
+            {attachmentsAt(pieces, dialog.cell).map((layer) => <button type="button" key={layer} onClick={() => { setPieces((ps) => removeAttachment(ps, dialog.cell, layer)); setDialog(null); }}>
+              {layer === "lamp" ? "Remove lamp only" : layer === "climbingPlant" ? "Remove climbing plant only" : "Remove trellis and vines; keep path"}
+            </button>)}
+            <button type="button" onClick={() => { setPieces((ps) => removeAt(level, ps, { type: "cell", ...dialog.cell })); setDialog(null); }}>Remove everything on this tile</button>
+          </div>
+        ) : dialog?.kind === "remove-window" ? (
           <div className="pg-object-chooser">
             <p>Keep the window and remove its plant, or remove both.</p>
             <button type="button" onClick={() => { setPieces((ps) => removeAt(level, ps, { ...dialog.target, type: "sill" })); setDialog(null); }}>Remove plant only</button>
@@ -189,6 +204,8 @@ function PlayLevel({ idx }: { idx: number }) {
           <>
             <p className="pg-meta">{explainedCheck.ratio >= 1 ? "Met" : explainedCheck.ratio > 0 ? "Partly met" : "Not yet met"}</p>
             <p>{explainedCheck.detail}</p>
+            <CheckDiagnostics check={explainedCheck} />
+            {level.scene && explainedCheck.marks?.length ? <button type="button" className="pg-chip" onClick={() => { setHighlightedCheck(explainedCheck.id); setDialog(null); }}>Show highlighted tiles on board</button> : null}
           </>
         ) : (
           <>

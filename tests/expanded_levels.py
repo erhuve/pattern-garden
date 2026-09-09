@@ -195,9 +195,9 @@ with sync_playwright() as p:
             assert saved(slug) == fixture['starting']
     print('PASS: all four built from scratch by real touch on desktop and phone, completion, reload, reset and adaptation context')
     page.goto(base)
-    expect(page.locator('.pg-level')).to_have_count(9)
+    expect(page.locator('.pg-level')).to_have_count(13)
     for fixture in fixtures:
         assert page.locator(f'a[href="/play/{fixture["slug"]}"]').count() >= 2
     assert not errors, errors
-    print('PASS: nine playable levels indexed; no runtime errors')
+    print('PASS: thirteen playable levels indexed; no runtime errors')
     browser.close()

@@ -2,6 +2,8 @@ import { useMemo, useRef, useState } from "react";
 import type { BoardTool, Cell, Evaluation, Layout, Level, PieceKind, Side, WallPiece } from "./types";
 import { DirectionalGlyph } from "./DirectionalGlyph";
 import { NewPieceGlyph } from "./NewPieceGlyph";
+import { LivingAttachment } from "./LivingGlyph";
+import { SceneOverlay, SceneGround } from "./SceneOverlay";
 import "./garden-board.css";
 import { resolveFacing } from "./orientation";
 import { alcoveAt, interiorCell, wallLength, type PlaceTarget } from "./geometry";
@@ -101,9 +103,10 @@ type Props = {
   tool: BoardTool | null;
   onTarget: (t: Target) => void;
   showLight: boolean;
+  highlightedCheck?: string;
 };
 
-export function Board({ level, layout, evaluation, people, tool, onTarget, showLight }: Props) {
+export function Board({ level, layout, evaluation, people, tool, onTarget, showLight, highlightedCheck }: Props) {
   const [hover, setHover] = useState<Target | null>(null);
   const { world, room } = layout;
   const segs = wallSegments(layout);
@@ -184,7 +187,7 @@ export function Board({ level, layout, evaluation, people, tool, onTarget, showL
     const directWall: Target | null = wallKey ? { type: "wall", side: wallKey[0] as Side, pos: Number(wallKey.slice(1)) } : null;
     const sillPlant = element?.closest("[data-sill-plant]");
     const cell = paintedPiece?.dataset.pieceCell?.split(",").map(Number);
-    const t: Target | null = cell && (tool === "erase" || tool === "plant")
+    const t: Target | null = cell && (tool === "erase" || tool === "plant" || tool === "lamp" || tool === "trellis")
       ? { type: "cell", x: cell[0], y: cell[1] }
       : tool === "rotate"
       ? cell ? { type: "cell", x: cell[0], y: cell[1] } : paintedWall ? null : resolveTarget(pt)
@@ -202,14 +205,15 @@ export function Board({ level, layout, evaluation, people, tool, onTarget, showL
       const inside = insideRoom || Boolean(alcoveAt(room, layout.pieces, { x, y }));
       const lit = inside && showLight ? lightCount(layout, { x, y }) : 0;
       const street = layout.street === "s" && y === world.h - 1;
-      const shade = !inside && showLight && layout.outdoorFurniture && layout.pieces.some((p) => p.kind === "tree" && Math.max(Math.abs(p.x - x), Math.abs(p.y - y)) <= 1);
+      const shade = layout.scene !== "garden-seat" && !inside && showLight && layout.outdoorFurniture && layout.pieces.some((p) => p.kind === "tree" && Math.max(Math.abs(p.x - x), Math.abs(p.y - y)) <= 1);
       const isA = attract.has(`${x},${y}`);
       const unhappy = unhappySeats.has(`${x},${y}`);
       ground.push(
         <g key={`c${x}-${y}`}>
           <polygon points={diamond(x, y)} className={inside ? "pg-floor" : street ? "pg-street" : "pg-grass"} data-ground-cell={`${x},${y}`} />
           {street && <line x1={iso(x + 0.3, y + 0.5).x} y1={iso(x + 0.3, y + 0.5).y} x2={iso(x + 0.7, y + 0.5).x} y2={iso(x + 0.7, y + 0.5).y} className="pg-street-mark" />}
-          {shade && <polygon points={diamond(x, y)} className="pg-tree-shade" data-shade-cell={`${x},${y}`} />}
+          <SceneGround layout={layout} x={x} y={y} showLight={showLight} />
+          {shade && layout.scene !== "garden-seat" && <polygon points={diamond(x, y)} className="pg-tree-shade" data-shade-cell={`${x},${y}`} />}
           {lit > 0 && <polygon points={diamond(x, y)} className="pg-light" style={{ opacity: Math.min(0.55, 0.22 * lit) }} />}
           {unhappy && <polygon points={diamond(x, y)} className="pg-unhappy" />}
           {isA && <polygon points={diamond(x, y)} className="pg-attract" />}
@@ -229,7 +233,23 @@ export function Board({ level, layout, evaluation, people, tool, onTarget, showL
   const inFrontOfHouse = (cell: Cell) => layout.outdoorFurniture && layout.setting !== "garden" &&
     (cell.x >= room.x + room.w || cell.y >= room.y + room.h);
   const renderPiece = (p: Layout["pieces"][number], i: number) => "side" in p ? [] :
-    [<PieceGlyph key={`p${i}`} kind={p.kind} x={p.x} y={p.y} facing={facings.get(`${p.x},${p.y}`)?.direction} manual={facings.get(`${p.x},${p.y}`)?.manual} />];
+    [<g key={`p${i}`}>
+      <PieceGlyph kind={p.kind} x={p.x} y={p.y} facing={facings.get(`${p.x},${p.y}`)?.direction} manual={facings.get(`${p.x},${p.y}`)?.manual} />
+      {p.kind === "table" && p.lamp && <LivingAttachment kind="lamp" x={p.x} y={p.y} />}
+      {p.kind === "path" && p.trellis && <LivingAttachment kind="trellis" x={p.x} y={p.y} planted={p.climbingPlant} />}
+    </g>];
+
+  const walkScene = layout.scene === "trellised-walk";
+  const walkLayers = walkScene ? [
+    ...sortedPieces.flatMap((p, i) => "side" in p ? [] : [
+      { depth: p.x + p.y, order: 0, key: `walk-piece-${i}`, node: <PieceGlyph kind={p.kind} x={p.x} y={p.y} facing={facings.get(`${p.x},${p.y}`)?.direction} manual={facings.get(`${p.x},${p.y}`)?.manual} /> },
+      ...(p.kind === "path" && p.trellis ? [
+        { depth: p.x + p.y - 0.75, order: 1, key: `walk-back-${i}`, node: <LivingAttachment kind="trellis" x={p.x} y={p.y} planted={p.climbingPlant} layer="back" /> },
+        { depth: p.x + p.y + 0.75, order: 3, key: `walk-front-${i}`, node: <LivingAttachment kind="trellis" x={p.x} y={p.y} planted={p.climbingPlant} layer="front" /> },
+      ] : []),
+    ]),
+    ...people.map((h) => ({ depth: h.x + h.y, order: 2, key: `walk-person-${h.id}`, node: <Person p={h} /> })),
+  ].sort((a, b) => a.depth - b.depth || a.order - b.order) : [];
 
   function renderWall(seg: WallSeg) {
     const piece = wallMap.get(`${seg.side}${seg.pos}`);
@@ -288,7 +308,7 @@ export function Board({ level, layout, evaluation, people, tool, onTarget, showL
     <svg
       ref={svgRef}
       viewBox={`${minX} ${minY} ${maxX - minX} ${maxY - minY}`}
-      className={`pg-board ${tool === "rotate" ? "is-rotating" : ""} ${tool === "erase" || tool === "plant" ? "is-picking" : ""}`}
+      className={`pg-board ${tool === "rotate" ? "is-rotating" : ""} ${tool === "erase" || tool === "plant" || tool === "lamp" || tool === "trellis" ? "is-picking" : ""}`}
       role="img"
       aria-label={`${level.title} board`}
       onPointerMove={(e) => {
@@ -315,14 +335,17 @@ export function Board({ level, layout, evaluation, people, tool, onTarget, showL
       <g>{ground}</g>
       <g>{backWalls.map(renderWall)}</g>
       <g>
-        {sortedPieces.filter((p) => "side" in p || !inFrontOfHouse(p)).flatMap(renderPiece)}
-        {people.filter((h) => !inFrontOfHouse(h)).map((h) => <Person key={h.id} p={h} />)}
+        {walkScene ? walkLayers.map((layer) => <g key={layer.key}>{layer.node}</g>) : <>
+          {sortedPieces.filter((p) => "side" in p || !inFrontOfHouse(p)).flatMap(renderPiece)}
+          {people.filter((h) => !inFrontOfHouse(h)).map((h) => <Person key={h.id} p={h} />)}
+        </>}
       </g>
       <g>{frontWalls.map(renderWall)}</g>
       <g data-front-exterior>
         {sortedPieces.filter((p) => !("side" in p) && inFrontOfHouse(p)).flatMap(renderPiece)}
         {people.filter(inFrontOfHouse).map((h) => <Person key={h.id} p={h} />)}
       </g>
+      <SceneOverlay layout={layout} evaluation={evaluation} highlightedCheck={highlightedCheck} />
     </svg>
   );
 }
@@ -345,6 +368,7 @@ function AlcoveBay({ seg, h, shade }: { seg: WallSeg; h: number; shade: string }
 }
 
 export function PieceGlyph({ kind, x, y, facing = "s", manual = false }: { kind: PieceKind; x: number; y: number; facing?: Side; manual?: boolean }) {
+  if (kind === "lamp" || kind === "trellis") return <LivingAttachment kind={kind} x={x} y={y} />;
   const c = iso(x + 0.5, y + 0.5);
   if (kind === "seat" || kind === "bench" || kind === "shelf" || kind === "gate") {
     return <g transform={`translate(${c.x} ${c.y})`} className="pg-piece" data-piece-cell={`${x},${y}`} data-facing-cell={`${x},${y}`} data-facing={facing} data-facing-mode={manual ? "manual" : "auto"} data-kind={kind}>

@@ -11,13 +11,13 @@ Design decisions agreed with Miku (Sept 2026):
 - **Web only.** Vite + React SVG isometric renderer. No 3D engine.
 - **Hybrid feel.** Charming miniature places, but governed by legible, deterministic puzzle rules.
 - **Scoring is rule-based; inhabitants are the payoff.** Each level defines explicit weighted checks (e.g. "windows on two different sides", "the path changes direction"). Score = weighted ratio of checks passed, but 100% is reserved for layouts where every check has a full ratio so rounding can never trigger a false completion. Light on Two Sides requires both supplied seats to receive cross-light from windows on two different walls before it can reach 100%. Palette counts are inventory limits, not requirements; spare pieces may remain unused. Tiny inhabitants wander the room and gravitate toward the cells the pattern marks as *attractors*; when they arrive they become "content" (music note). They never affect score.
-- **Handful of quality levels first.** Nine patterns are playable: the original five (159 Light on Two Sides of Every Room, 112 Entrance Transition, 180 Window Place, 179 Alcoves, 185 Sitting Circle), plus 242 Front Door Bench, 171 Tree Places, 163 Outdoor Room and 183 Workspace Enclosure. All 253 patterns appear on the home page; unbuilt ones are locked. New levels explicitly distinguish the book's ideas from the exact tile-based puzzle interpretation in About.
+- **Handful of quality levels first.** Thirteen patterns are playable: the original five (159 Light on Two Sides of Every Room, 112 Entrance Transition, 180 Window Place, 179 Alcoves, 185 Sitting Circle), plus 242 Front Door Bench, 171 Tree Places, 163 Outdoor Room, 183 Workspace Enclosure, 192 Windows Overlooking Life, 182 Eating Atmosphere, 176 Garden Seat and 174 Trellised Walk. All 253 patterns appear on the home page; unbuilt ones are locked. New levels explicitly distinguish the book's ideas from the exact tile-based puzzle interpretation in About.
 
 ### Structure
 
 - `src/data/apl.json` — all 253 patterns (number, title, section, subsection, stars) plus the 1858 cross-reference edges. Derived from BeksOmega/pattern-language-graph GraphML; two duplicate numbers in the source (73→75 The Family, 201→211 Thickening the Outer Walls) were corrected by hand.
 - `src/game/types.ts` — `Piece` (wall pieces live on a room side+pos; cell pieces live on a grid cell), `Layout`, `Level`, `Check`.
-- `src/game/levels.ts` — the original five levels and combined nine-level registry. `expanded-levels.ts` holds the four additions, with paraphrased context, explicit puzzle adaptations, palette limits and `evaluate(layout)` returning checks + attractors. `evaluate(level, layout)` computes the 0–100 score.
+- `src/game/levels.ts` — the original five levels and combined thirteen-level registry. `expanded-levels.ts` and `living-levels.ts` each hold four additions, with paraphrased context, explicit puzzle adaptations, palette limits and `evaluate(layout)` returning checks + attractors. `evaluate(level, layout)` computes the 0–100 score.
 - `src/game/geometry.ts` — grid helpers, `placeAt` / `removeAt` with placement rules (indoor vs outdoor pieces, wall vs floor, occupancy). Alcoves extend the room by one usable recessed floor cell; attached furniture is removed with the alcove.
 - `src/game/inhabitants.ts` — spawn / retarget / step for the little people. Blocking furniture is not walkable.
 - `src/game/Board.tsx` — SVG isometric renderer. Back walls full height, front walls knee-high so the interior stays visible. Hit targets carry `data-cell="x,y"` and `data-wall="<side><pos>"` for testing.
@@ -29,7 +29,7 @@ Design decisions agreed with Miku (Sept 2026):
 
 ### Adding a level
 
-Add a `Level` object to a level module and include it in `LEVELS` (`expanded-levels.ts` exports the four additions). Give every check clear pass/fail detail and a known-good layout built legally through `placeAt`. Verify removal, obstruction, order independence, shared-candidate matching and current score vs historical best. Test desktop/phone placement, completion, reload, reset and criterion explanations. Preserve the existing five patterns and saved coordinates.
+Add a `Level` object to a level module and include it in `LEVELS` (`expanded-levels.ts` exports the four additions). Give every check clear pass/fail detail and a known-good layout built legally through `placeAt`. Verify removal, obstruction, order independence, shared-candidate matching and current score vs historical best. Test desktop/phone placement, completion, reload, reset and criterion explanations. Preserve existing patterns, saved coordinates and historical best scores.
 
 ### Four additional places
 
@@ -48,6 +48,25 @@ Pattern references: [Front Door Bench](https://patternlanguage.cc/Patterns/Front
 
 `tests/expanded_levels.py` plays all four from reset to 100% with real touch on desktop and phone and checks 40 viewport/level combinations, inventory, garden rendering, bench occlusion, reload, reset, rotation, shade and About. Unit coverage includes all four legal solutions, incomplete/blocked layouts, no mutation, insertion-order invariance, movement and four-view bench occlusion. Run alongside the existing layout, orientation, completion and window suites.
 
+
+### Four living patterns
+
+`living-levels.ts` adds four independently solvable puzzles. `living-solutions.ts` contains verified solutions and host-before-attachment build sequences. None change earlier levels' scoring or saved layouts; no save-version migration is needed.
+
+- **Windows Overlooking Life (192):** two distinct south windows overlook a populated public walk. Both indoor chairs need an unobstructed view through separate windows, must face the view, and need a walk from the north entrance. Shelves and other seats block sight; low plants and tables do not. Auto orientation follows the same indoor sight model.
+- **Eating Atmosphere (182):** one table, four cardinal chairs facing it, a hanging lamp attached over that table, and a free pullback tile behind every chair reachable from the fixed north door. Plants and shelves are optional. The entry cannot be erased; the player receives an explanatory message. The lamp creates a visibly bright 3×3 island within a dimmer floor; this is not a lighting simulation.
+- **Garden Seat (176):** a solitary bench screened from every tile of the busy public walk, backed and side-sheltered, sunny under a visible fixed-afternoon map, facing planting with an open and reachable front. Hedges shade their immediately northern tile; trees shade three northern rows with one-column spread. Cardinal paths are optional; walking on open grass is allowed. The rules are a disclosed tile approximation, not a solar or privacy simulation.
+- **Trellised Walk (174):** one edge-connected stone route between already-paved endpoints, with a trellis and climbing vine over every route tile. Attachments share the stone tile and do not obstruct walking. The route minimizes missing stones, roofs, vines, then distance; a legally planted detour can beat an uncovered shortcut. Fourteen stones/trellises and sixteen plants allow bends and spare planting. Disconnected pieces cannot supply completion checks for another route.
+
+`Layout.scene` chooses static scene paving, visible activity, and lighting. `scene-terrain.ts` is shared by placement, sunlight scoring and rendering: public pavement cannot be overwritten and path stones connect beside it. `living-rules.ts` supplies shared sight and shelter helpers. Fixed starts and palette counts remain level-specific.
+
+Lamp and trellis are palette tools, not independent floor occupants. Tables persist `lamp?: true`; paths persist `trellis?: true` and `climbingPlant?: true`. `usedInventory` includes attachments and all forms of plants. `attachments.ts` provides selective removal; removing a host returns all attached inventory. Tapping the visible tabletop, lamp or trellis identifies its host rather than inverse-projecting the raised artwork onto an unrelated floor tile. Trellis backs, occupants and roofs use explicit painter ordering; all original level rendering remains unchanged.
+
+New check results carry optional `marks`. Selecting a criterion highlights its relevant tiles; on mobile, the explanation has a Show highlighted tiles button. `CheckDiagnostics.tsx` exposes the exact reasons and 1-based tile coordinates in an accessible text list rather than relying on SVG hover titles. `SceneOverlay.tsx` renders the promenade, sun map, labels and nonblocking diagnostic marks. `LivingGlyph.tsx`/`living-art.css` provide the lamp, planted canopy and matching inventory icons. Rotation explanations describe the new scored directions; legacy direction-independent levels retain their behavior.
+
+Verification: `bun test src/game`; `bunx tsc --noEmit`; `bun run build`; `python3 tests/living_levels.py --build-dir <build>` (or `--base-url <url>`). The new browser suite covers 40 viewport/level combinations and actual desktop/phone touch builds, all four completions, reload/reset, painted tabletop and trellis taps, attachment removal, fixed-door protection, and accessible diagnostic reasons. Run the existing play-layout, expanded-levels, orientation, window-details, completion and glyph-occlusion suites too. Regression tests include legally built bent trellis paths, direction-sensitive checks, obstruction, isolated pockets, exact completion, inventory, and nonmutation.
+
+Sources for paraphrased context: [Windows Overlooking Life](https://patternlanguage.cc/Patterns/Windows-Overlooking-Life-(192)), [Eating Atmosphere](https://patternlanguage.cc/Patterns/Eating-Atmosphere-(182)), [Garden Seat](https://patternlanguage.cc/Patterns/Garden-Seat-(176)), [Trellised Walk](https://patternlanguage.cc/Patterns/Trellised-Walk-(174)). About distinguishes each puzzle's rules from the book's broader recommendations.
 
 ---
 

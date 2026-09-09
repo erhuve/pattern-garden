@@ -1,7 +1,9 @@
 import { PieceGlyph } from "./Board";
+import { LivingIcon } from "./LivingGlyph";
 import type { PieceKind } from "./types";
 
 export function PieceIcon({ kind }: { kind: PieceKind }) {
+  if (kind === "lamp" || kind === "trellis") return <LivingIcon kind={kind} />;
   if (kind === "window" || kind === "door" || kind === "alcove") {
     return (
       <svg viewBox="0 0 56 56" className="pg-piece-icon" aria-hidden="true" focusable="false">

@@ -3,6 +3,7 @@ import { ArrowRight, Check, ChevronRight, Eraser, Info, Lightbulb, RotateCcw, Ro
 import type { BoardTool, CheckResult, Evaluation, Level, Piece } from "./types";
 import { PIECE_LABELS, WALL_KINDS } from "./types";
 import { PieceIcon } from "./PieceIcon";
+import { CheckDiagnostics } from "./CheckDiagnostics";
 import { usedInventory } from "./geometry";
 
 export function PlayDialog({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
@@ -47,10 +48,11 @@ function checkStatus(check: CheckResult) {
   return check.ratio >= 1 ? "Met" : check.ratio > 0 ? "Partly met" : "Not yet met";
 }
 
-export function CriteriaPanel({ evaluation, onExplain, completeLine, onNext, explainOnTap = false }: {
+export function CriteriaPanel({ evaluation, onExplain, completeLine, onNext, onSelect, explainOnTap = false }: {
   evaluation: Evaluation;
   explainOnTap?: boolean;
   onExplain: (check: CheckResult) => void;
+  onSelect?: (check: CheckResult) => void;
   completeLine: string;
   onNext?: () => void;
 }) {
@@ -74,6 +76,7 @@ export function CriteriaPanel({ evaluation, onExplain, completeLine, onNext, exp
               aria-pressed={check.id === selected?.id}
               onClick={() => {
                 setSelectedId(check.id);
+                onSelect?.(check);
                 if (window.matchMedia("(max-width: 760px), (max-height: 600px)").matches || explainOnTap && window.matchMedia("(max-height: 780px)").matches || evaluation.score === 100) onExplain(check);
               }}>
               <span className="pg-check-mark" aria-hidden="true">
@@ -97,6 +100,7 @@ export function CriteriaPanel({ evaluation, onExplain, completeLine, onNext, exp
           <span className="pg-side-label">{checkStatus(selected)}</span>
           <h3>{selected.label}</h3>
           <p>{selected.detail}</p>
+          <CheckDiagnostics check={selected} />
         </section>
       )}
       {evaluation.score < 100 && <p className="pg-criteria-hint">Select a check to see what it needs.</p>}
@@ -119,7 +123,7 @@ export function BoardTools({ level, pieces, tool, onTool, showLight, onLight, on
       <div className="pg-board-palette" role="group" aria-label="Building pieces. Counts show used inventory; extras are optional." style={{ ["--piece-total" as string]: level.palette.length + 2 }}>
         {level.palette.map((entry) => {
           const used = usedInventory(pieces, entry.kind);
-          const surface = level.setting === "garden" ? "garden ground" : entry.kind === "bench" || entry.kind === "hedge" || entry.kind === "tree" || entry.kind === "path" || entry.kind === "gate" ? "outside ground" : entry.kind === "plant" ? "floor or window sill" : WALL_KINDS.has(entry.kind) ? "wall" : "floor";
+          const surface = entry.kind === "lamp" ? "table" : entry.kind === "trellis" ? "path stone" : entry.kind === "plant" && level.scene === "trellised-walk" ? "trellis or garden ground" : level.setting === "garden" ? "garden ground" : entry.kind === "bench" || entry.kind === "hedge" || entry.kind === "tree" || entry.kind === "path" || entry.kind === "gate" ? "outside ground" : entry.kind === "plant" ? "floor or window sill" : WALL_KINDS.has(entry.kind) ? "wall" : "floor";
           return (
             <button key={entry.kind} type="button"
               className={`pg-tool pg-piece-tile ${tool === entry.kind ? "is-active" : ""} ${used >= entry.max ? "is-spent" : ""}`}
@@ -138,7 +142,7 @@ export function BoardTools({ level, pieces, tool, onTool, showLight, onLight, on
       </div>
       <p className="pg-placement-hint" aria-live="polite" aria-atomic="true">
         <strong>{tool === "rotate" ? "Rotate" : tool === "erase" ? "Remove" : tool ? PIECE_LABELS[tool] : "Select a piece"}</strong>
-        <span>{tool === "rotate" ? "Tap a seat, bench, shelf or gate" : tool === "erase" ? "Tap a piece; planted windows give you a choice" : tool === "plant" ? "Tap a window sill or a floor tile" : tool && WALL_KINDS.has(tool) ? "Tap a wall" : level.setting === "garden" || tool === "bench" || tool === "hedge" ? "Tap a free garden tile" : "Tap a floor tile"}</span>
+        <span>{tool === "rotate" ? "Tap a seat, bench, shelf or gate" : tool === "erase" ? "Tap a piece; attachments give you a choice" : tool === "lamp" ? "Tap the table to light the meal" : tool === "trellis" ? "Tap a path stone to roof it" : tool === "plant" && level.scene === "trellised-walk" ? "Tap a trellis to grow climbing vines" : tool === "plant" ? "Tap a window sill or a floor tile" : tool && WALL_KINDS.has(tool) ? "Tap a wall" : level.setting === "garden" || tool === "bench" || tool === "hedge" ? "Tap a free garden tile" : "Tap a floor tile"}</span>
       </p>
       <div className="pg-board-actions" role="group" aria-label="Board controls">
         <button type="button" className={`pg-icon-button ${showLight ? "is-on" : ""}`} onClick={onLight} aria-pressed={showLight} aria-label="Daylight" title={level.outdoorFurniture ? "Show tree shade and daylight" : "Show daylight"}><Lightbulb aria-hidden="true" /></button>

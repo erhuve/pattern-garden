@@ -7,3 +7,6 @@
 }
 
 .pg-board.is-picking .pg-piece { pointer-events: visiblePainted; }
+
+.pg-board.is-picking [data-attachment-kind],
+.pg-board.is-picking [data-attachment-kind] * { pointer-events: visiblePainted; }

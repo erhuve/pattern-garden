@@ -1,5 +1,6 @@
 import type { Cell, CellPiece, Layout, Piece, Side } from "./types";
 import { isCellPiece } from "./types";
+import { gardenShelter, gardenView, windowCorridor } from "./living-rules";
 import { indoorCell, alcoveAt, cellPieces, chebyshev, exteriorCell, connectedPath, inRoom, interiorCell, inWorld, manhattan, sameCell, wallPieces } from "./geometry";
 
 export const FACINGS: readonly Side[] = ["n", "e", "s", "w"];
@@ -78,7 +79,7 @@ export function automaticFacing(slug: string, layout: Layout, piece: CellPiece):
   const alcove = alcoveAt(layout.room, layout.pieces, piece);
   if (alcove && piece.kind !== "gate") return result(OPPOSITE[alcove.side], safeFront(layout, piece, OPPOSITE[alcove.side], false)
     ? "Faces the alcove opening, back into the room." : "Faces the alcove opening; furniture currently blocks the space in front.");
-  const windowPlace = slug === "window-place" && piece.kind === "seat";
+  const windowPlace = (slug === "window-place" || layout.scene === "overlooking-life") && piece.kind === "seat";
   const safe = FACINGS.filter((side) => safeFront(layout, piece, side, windowPlace));
   const outdoor = piece.kind === "gate" || piece.kind === "bench" || layout.outdoorFurniture && !indoor(layout, piece);
   const inward = FACINGS.filter((side) => inWorld(layout.world, nextCell(piece, side)) && (outdoor ? !indoor(layout, nextCell(piece, side)) : indoor(layout, nextCell(piece, side))));
@@ -104,8 +105,25 @@ export function automaticFacing(slug: string, layout: Layout, piece: CellPiece):
     directions.sort((a, b) => count(b) - count(a));
     return result(directions[0] ?? fallback, paths.length ? "Passage lines up with the neighboring path stones." : "Passage points toward the entrance.");
   }
+  if (layout.scene === "overlooking-life" && piece.kind === "seat") {
+    const blockers = cells.filter((p) => ["shelf", "tree", "hedge", "seat", "bench", "desk", "hearth"].includes(p.kind));
+    const window = wallPieces(layout).find((wall) => {
+      if (wall.kind !== "window" || wall.side !== "s") return false;
+      const corridor = windowCorridor(layout, piece, wall);
+      return corridor && !corridor.some((cell) => blockers.some((blocker) => sameCell(blocker, cell)));
+    });
+    if (window) return result(window.side, "Faces the promenade through the aligned window. Low plants do not block the view.");
+  }
   if (!safe.length) return result(fallback, "No clear front available; uses the inward direction rather than a solid wall.");
   if (piece.kind === "bench" && layout.street && candidates.includes(layout.street)) return result(layout.street, "Faces the street from this sheltered spot beside the door.");
+  if (layout.scene === "garden-seat" && piece.kind === "bench") {
+    const ranked = candidates.map((side) => {
+      const view = gardenView(layout, piece, side);
+      const shelter = gardenShelter(layout, piece, side);
+      return { side, value: Number(view.clear) * 8 + Number(view.plants.length > 0) * 4 + Number(shelter.sheltered) * 2 + Number(side === "n") };
+    }).sort((a, b) => b.value - a.value || FACINGS.indexOf(a.side) - FACINGS.indexOf(b.side));
+    return result(ranked[0]?.side ?? fallback, "Faces a clear planted opening, favoring back and side shelter away from the promenade.");
+  }
   if (windowPlace) {
     const side = candidates.find((side) => glazing(layout, piece, side));
     if (side) return result(side, "Faces the glass in this window place.");

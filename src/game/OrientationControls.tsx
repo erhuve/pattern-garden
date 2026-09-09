@@ -10,7 +10,7 @@ export function OrientationControls({ slug, layout, piece, onChange }: {
   const auto = automaticFacing(slug, layout, piece);
   const kind = piece.kind === "shelf" || piece.kind === "gate" || piece.kind === "bench" ? piece.kind : "seat";
   return <div className="pg-orientation">
-    <p>Auto follows the room as you build. Choose a fixed direction if you want something different. {slug === "front-door-bench" && piece.kind === "bench" ? "This bench must face the street to satisfy the street-view criterion." : "Direction does not change your score."}</p>
+    <p>Auto follows the room as you build. Choose a fixed direction if you want something different. {slug === "front-door-bench" && piece.kind === "bench" ? "This bench must face the street to satisfy the street-view criterion." : layout.scene === "overlooking-life" && piece.kind === "seat" ? "Both seats must face their windows to satisfy the view criterion." : layout.scene === "eating-atmosphere" && piece.kind === "seat" ? "Each chair must face the table to satisfy the dining criterion." : layout.scene === "garden-seat" && piece.kind === "bench" ? "The bench’s drawn direction determines its planted view, shelter and clear approach." : "Direction does not change your score."}</p>
     <button type="button" className="pg-auto-facing" aria-pressed={!isFacing(piece.facing)} onClick={() => onChange("auto")}>
       <strong>Auto</strong><span>{auto.reason}</span>
     </button>

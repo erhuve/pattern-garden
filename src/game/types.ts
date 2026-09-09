@@ -13,18 +13,20 @@ export type CellPieceKind =
   | "bench"
   | "desk"
   | "hedge";
-export type PieceKind = WallPieceKind | CellPieceKind;
+export type PieceKind = WallPieceKind | CellPieceKind | "lamp" | "trellis";
+export type Scene = "overlooking-life" | "eating-atmosphere" | "garden-seat" | "trellised-walk";
 
 export type WallPiece =
   | { kind: "window"; side: Side; pos: number; sillPlant?: true }
   | { kind: "door" | "alcove"; side: Side; pos: number };
-export type CellPiece = { kind: CellPieceKind; x: number; y: number; facing?: Side };
+export type CellPiece = { kind: CellPieceKind; x: number; y: number; facing?: Side; lamp?: true; trellis?: true; climbingPlant?: true };
 export type BoardTool = PieceKind | "erase" | "rotate";
 export type Piece = WallPiece | CellPiece;
 
 export type Rect = { x: number; y: number; w: number; h: number };
 
 export type Layout = {
+  scene?: Scene;
   setting?: "garden";
   outdoorFurniture?: boolean;
   obstacleAware?: boolean;
@@ -41,6 +43,7 @@ export type CheckResult = {
   points: number;
   earned: number;
   ratio: number;
+  marks?: { cell: Cell; tone: "good" | "bad" | "hint"; label?: string }[];
 };
 
 export type Cell = { x: number; y: number };
@@ -61,6 +64,7 @@ export type Level = {
   tagline: string;
   quote: string;
   adaptation?: string;
+  scene?: Scene;
   setting?: "garden";
   outdoorFurniture?: boolean;
   obstacleAware?: boolean;
@@ -99,4 +103,6 @@ export const PIECE_LABELS: Record<PieceKind, string> = {
   bench: "Bench",
   desk: "Desk",
   hedge: "Hedge",
+  lamp: "Table lamp",
+  trellis: "Trellis",
 };

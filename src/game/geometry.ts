@@ -1,5 +1,6 @@
 import type { Cell, CellPiece, Layout, Level, Piece, PieceKind, Rect, Side, WallPiece, WallPieceKind } from "./types";
 import { isCellPiece, isWallPiece } from "./types";
+import { sceneReserved } from "./scene-terrain";
 
 export function wallLength(room: Rect, side: Side): number {
   return side === "n" || side === "s" ? room.w : room.h;
@@ -144,7 +145,9 @@ export function pathTurns(path: Cell[]): number {
 export type PlaceTarget = { type: "cell"; x: number; y: number } | { type: "wall"; side: Side; pos: number } | { type: "sill"; side: Side; pos: number };
 
 export function usedInventory(pieces: Piece[], kind: PieceKind): number {
-  return pieces.filter((p) => p.kind === kind).length + (kind === "plant" ? pieces.filter((p) => p.kind === "window" && p.sillPlant === true).length : 0);
+  if (kind === "lamp") return pieces.filter((p) => p.kind === "table" && p.lamp === true).length;
+  if (kind === "trellis") return pieces.filter((p) => p.kind === "path" && p.trellis === true).length;
+  return pieces.filter((p) => p.kind === kind).length + (kind === "plant" ? pieces.filter((p) => p.kind === "window" && p.sillPlant === true || p.kind === "path" && p.trellis === true && p.climbingPlant === true).length : 0);
 }
 
 const OUTDOOR_KINDS = new Set<PieceKind>(["tree", "path", "gate", "bench", "hedge"]);
@@ -176,6 +179,18 @@ export function placeAt(level: Level, pieces: Piece[], kind: PieceKind, t: Place
   if (isWallKind(kind)) return "That piece belongs on a wall.";
   const c = { x: t.x, y: t.y };
   if (!inWorld(level.world, c)) return "Off the edge of the world.";
+  if (sceneReserved(level, c)) return "This is an existing public walk. Connect your path beside it; do not place pieces on it.";
+  const host = pieces.find((p) => isCellPiece(p) && sameCell(p, c));
+  if (kind === "lamp" || kind === "trellis") {
+    const expected = kind === "lamp" ? "table" : "path";
+    if (!host || !isCellPiece(host) || host.kind !== expected) return kind === "lamp" ? "Place the light directly over a table." : "Place the trellis over a path stone; the path stays walkable underneath.";
+    if (host[kind]) return `There is already a ${kind} here.`;
+    return pieces.map((p) => p === host ? { ...host, [kind]: true } : p);
+  }
+  if (kind === "plant" && host?.kind === "path" && host.trellis) {
+    if (host.climbingPlant) return "This trellis already has a climbing plant.";
+    return pieces.map((p) => p === host ? { ...host, climbingPlant: true } : p);
+  }
   const inside = indoorCell({ ...level, pieces }, c);
   if (OUTDOOR_KINDS.has(kind) && inside) return `A ${kind} belongs outside the room.`;
   if (INDOOR_KINDS.has(kind) && !inside && !(level.outdoorFurniture && (kind === "seat" || kind === "table"))) return `A ${kind} belongs inside the room.`;
@@ -184,7 +199,12 @@ export function placeAt(level: Level, pieces: Piece[], kind: PieceKind, t: Place
   return [...pieces, { kind, x: c.x, y: c.y } as CellPiece];
 }
 
+export function isFixedTarget(level: Level, t: PlaceTarget): boolean {
+  return level.scene === "eating-atmosphere" && t.type === "wall" && t.side === "n" && t.pos === 3;
+}
+
 export function removeAt(level: Level, pieces: Piece[], t: PlaceTarget): Piece[] {
+  if (isFixedTarget(level, t)) return pieces;
   if (t.type === "sill") {
     return pieces.map((p) => {
       if (p.kind !== "window" || p.side !== t.side || p.pos !== t.pos) return p;

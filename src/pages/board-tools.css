@@ -59,6 +59,11 @@
 .pg-piece-tile .pg-flame {
   animation: none;
 }
+.pg-board-palette .pg-piece-tile .pg-living-piece-icon {
+  width: calc(var(--tile) - 14px);
+  height: calc(var(--tile) - 18px);
+  max-height: calc(var(--tile) - 18px);
+}
 .pg-board-palette .pg-piece-tile .pg-tool-count {
   position: absolute;
   right: 5px;

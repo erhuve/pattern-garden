@@ -1,6 +1,7 @@
 import type { Cell, CheckResult, Evaluation, Layout, Level, Rect, Side, WallPiece } from "./types";
 import { windowNook } from "./window-place";
 import { EXPANDED_LEVELS } from "./expanded-levels";
+import { LIVING_LEVELS } from "./living-levels";
 import {
   cellPieces,
   alcoveCell,
@@ -301,7 +302,7 @@ const sittingCircle: Level = {
   },
 };
 
-export const LEVELS: Level[] = [lightOnTwoSides, entranceTransition, windowPlace, alcoves, sittingCircle, ...EXPANDED_LEVELS];
+export const LEVELS: Level[] = [lightOnTwoSides, entranceTransition, windowPlace, alcoves, sittingCircle, ...EXPANDED_LEVELS, ...LIVING_LEVELS];
 
 export function levelBySlug(slug: string | undefined): Level | undefined {
   return LEVELS.find((l) => l.slug === slug);

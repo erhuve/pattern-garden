@@ -130,9 +130,9 @@ describe("context-aware orientation", () => {
     expect(resolveFacing("alcoves", layout([...auto, { kind: "table", x: 5, y: 3 }]), auto[0]).direction).toBe("e");
   });
 
-  test("manual edits preserve every level's scores, checks, coordinates, order and inventory", () => {
+  test("manual edits preserve legacy levels' scores, checks, coordinates, order and inventory", () => {
     const pieces: Piece[] = [seat(3, 2), seat(3, 3), { kind: "window", side: "n", pos: 1 }, { kind: "window", side: "e", pos: 1 }, { kind: "shelf", x: 5, y: 3 }, { kind: "gate", x: 0, y: 7 }];
-    for (const level of LEVELS) {
+    for (const level of LEVELS.filter((level) => !level.scene)) {
       const original = { ...layout(pieces), room: level.room, world: level.world };
       for (const p of pieces.filter((p): p is CellPiece => "x" in p)) {
         for (const side of FACINGS) {
