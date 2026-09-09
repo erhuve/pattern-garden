@@ -152,8 +152,8 @@ describe("Front Door Bench", () => {
     expect(ratio(slug, movedDoor, "bench")).toBe(0);
   });
 
-  test("all five path stones, including both endpoints, are required", () => {
-    for (const y of [4, 5, 6, 7, 8]) {
+  test("all four garden stones, including the doorstep and road-adjacent tile, are required", () => {
+    for (const y of [4, 5, 6, 7]) {
       expect(ratio(slug, withoutCell(solution(slug), 4, y), "path")).toBe(0);
     }
   });

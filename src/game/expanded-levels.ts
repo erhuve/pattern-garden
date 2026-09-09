@@ -31,7 +31,7 @@ const frontDoorBench: Level = {
   number: 242, slug: "front-door-bench", title: "Front Door Bench",
   tagline: "A sheltered seat at the threshold, with the street still in view.",
   quote: "A bench near the entrance gives household life a comfortable place to meet the passing street. Planting beside it can make a small, half-private territory without cutting it off from the world.",
-  adaptation: "This puzzle uses one street-facing sight line and a continuous stone path. A neighboring plant, tree or hedge marks the private edge; the book allows many other ways to make this welcoming threshold. The bench must face the street; Auto does this when the way is clear.",
+  adaptation: "This puzzle uses one street-facing sight line and a continuous stone path from the doorstep to a garden tile directly beside the road. The road is already paved; no stone is needed on it. A neighboring plant, tree or hedge marks the private edge; the book allows many other ways to make this welcoming threshold. The bench must face the street; Auto does this when the way is clear.",
   completeLine: "The door is close, the street is visible, and there is a place to linger.",
   inhabitants: 2, world: { w: 9, h: 9 }, room: { x: 2, y: 1, w: 5, h: 3 },
   outdoorFurniture: true, street: "s",
@@ -43,7 +43,8 @@ const frontDoorBench: Level = {
     const floorSet = new Set(floor.map(cellKey));
     const indoorSet = new Set(freeFloor(layout, "inside").map(cellKey));
     const paths = ofKind(layout, "path").filter((p) => floorSet.has(cellKey(p)));
-    const streetPaths = reachable(paths, paths.filter((p) => onEdge(layout, p, street)));
+    const road = floor.filter((cell) => onEdge(layout, cell, street));
+    const streetPaths = reachable([...paths, ...road], road);
     const greens = cellPieces(layout).filter((p) => ["plant", "tree", "hedge"].includes(p.kind) && !inRoom(layout.room, p));
     return bestCandidate(maybe(validWalls(layout, "door")).flatMap((door) => maybe(ofKind(layout, "bench")).map((bench) => {
       const threshold = door && exteriorCell(layout.room, door);
@@ -58,7 +59,7 @@ const frontDoorBench: Level = {
         rule("door", "A clear doorway, inside and out", 20, clearDoor, clearDoor ? "Both sides of the doorway are free to walk through." : "Keep a door and leave its inside and outside threshold empty or paved, not occupied by furniture or planting."),
         rule("bench", "A bench beside the same doorway", 20, placed, placed ? "The bench stands against the door's facade, within two steps and off the threshold." : "Place the bench immediately alongside the house on the same wall as the door, within two cardinal steps of its outside tile. Keep the threshold free."),
         rule("view", "Face the street with a clear view", 20, view, view ? "The bench faces the street along a clear sight line." : bench && !facesStreet ? `Use Rotate → Bench → Auto or ${FACING_LABELS[street]} to face the street. Keep its front clear; path stones are fine.` : "Keep a straight view from the bench to the street band. Trees, hedges and the building block it."),
-        rule("path", "A stone route and a bench approach", 20, path, path ? "Connected stones reach from the south edge to the threshold, and a clear walk reaches the front of the bench." : "Put a stone directly outside the door and one on the street strip itself. Join them with edge-touching stones, then leave a clear walk to the front of the bench; that last walk may be grass."),
+        rule("path", "A stone route and a bench approach", 20, path, path ? "Connected stones join the doorstep to the road's edge, and a clear walk reaches the front of the bench. The road needs no stones." : "Put a stone directly outside the door and connect it with edge-touching stones to a garden tile directly beside the road. No stone is needed on the road itself. Leave a clear walk to the front of the bench; that last walk may be grass."),
         rule("privacy", "A planted private edge", 20, privacy, privacy ? "Greenery beside or behind the bench marks a small private edge." : "Add a plant, tree or hedge immediately beside or behind the bench, not in its south-facing opening. A diagonal planting is not a boundary."),
       ];
       return { checks, attractors: bench && checks.every((check) => check.ratio === 1) ? asCells([bench]) : [] };

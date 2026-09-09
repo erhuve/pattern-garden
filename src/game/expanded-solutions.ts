@@ -5,7 +5,7 @@ export const EXPANDED_SOLUTIONS: Record<string, Piece[]> = {
     { kind: "door", side: "s", pos: 2 },
     { kind: "bench", x: 3, y: 4 },
     { kind: "plant", x: 2, y: 4 },
-    ...[4, 5, 6, 7, 8].map((y): Piece => ({ kind: "path", x: 4, y })),
+    ...[4, 5, 6, 7].map((y): Piece => ({ kind: "path", x: 4, y })),
   ],
   "tree-places": [
     { kind: "tree", x: 4, y: 2 },
