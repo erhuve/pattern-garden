@@ -90,7 +90,7 @@ describe("expanded level contracts", () => {
       }
     });
 
-    test(`${level.slug}: scoring is immutable, order independent and rotation independent`, () => {
+    test(`${level.slug}: scoring is immutable, order independent and only street-facing benches depend on rotation`, () => {
       const layout = freeze({ ...level, pieces: solution(level.slug) });
       const before = JSON.stringify(layout);
       const expected = evaluate(level, layout);
@@ -98,7 +98,12 @@ describe("expanded level contracts", () => {
       expect(evaluate(level, { ...level, pieces: [...layout.pieces].reverse() })).toEqual(expected);
       for (const facing of ["n", "e", "s", "w"] as const) {
         const pieces = layout.pieces.map((piece) => isCellPiece(piece) ? { ...piece, facing } : { ...piece });
-        expect(result(level.slug, pieces)).toEqual(expected);
+        if (level.slug === "front-door-bench" && facing !== level.street) {
+          expect(result(level.slug, pieces).checks.find((item) => item.id === "view")?.ratio).toBe(0);
+          expect(result(level.slug, pieces).score).toBe(80);
+        } else {
+          expect(result(level.slug, pieces)).toEqual(expected);
+        }
       }
       for (let offset = 0; offset < layout.pieces.length; offset++) {
         const pieces = [...layout.pieces.slice(offset), ...layout.pieces.slice(0, offset)];
@@ -166,7 +171,10 @@ describe("Front Door Bench", () => {
 
   test("the street route must also reach the front of the bench", () => {
     expect(ratio(slug, [...solution(slug), { kind: "plant", x: 3, y: 5 }], "path")).toBe(0);
-    expect(ratio(slug, [...solution(slug), { kind: "plant", x: 3, y: 5 }], "view")).toBe(1);
+    expect(ratio(slug, [...solution(slug), { kind: "plant", x: 3, y: 5 }], "view")).toBe(0);
+    const fixed = solution(slug).map((piece): Piece => piece.kind === "bench" ? { ...piece, facing: "s" } : piece);
+    expect(ratio(slug, [...fixed, { kind: "plant", x: 3, y: 5 }], "view")).toBe(1);
+    expect(ratio(slug, [...fixed, { kind: "plant", x: 3, y: 5 }], "path")).toBe(0);
   });
 
   test("trees and hedges block the street sight line even on the far street edge", () => {

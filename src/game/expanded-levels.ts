@@ -1,6 +1,7 @@
 import type { Cell, CellPiece, Layout, Level, Side, WallPiece } from "./types";
 import { cellPieces, chebyshev, exteriorCell, inRoom, interiorCell, inWorld, manhattan, neighbors4, sameCell, wallLength, wallPieces } from "./geometry";
 import { bestCandidate, byPosition, cellKey, freeFloor, onEdge, OPPOSITE, reachable, rule, sideOf, SIDES, step } from "./place-rules";
+import { FACING_LABELS, resolveFacing } from "./orientation";
 
 const ofKind = (layout: Layout, kind: CellPiece["kind"]) => cellPieces(layout).filter((p) => p.kind === kind).sort(byPosition);
 const validWalls = (layout: Layout, kind: WallPiece["kind"]) => wallPieces(layout)
@@ -30,7 +31,7 @@ const frontDoorBench: Level = {
   number: 242, slug: "front-door-bench", title: "Front Door Bench",
   tagline: "A sheltered seat at the threshold, with the street still in view.",
   quote: "A bench near the entrance gives household life a comfortable place to meet the passing street. Planting beside it can make a small, half-private territory without cutting it off from the world.",
-  adaptation: "This puzzle uses one street-facing sight line and a continuous stone path. A neighboring plant, tree or hedge marks the private edge; the book allows many other ways to make this welcoming threshold. Rotation is decorative.",
+  adaptation: "This puzzle uses one street-facing sight line and a continuous stone path. A neighboring plant, tree or hedge marks the private edge; the book allows many other ways to make this welcoming threshold. The bench must face the street; Auto does this when the way is clear.",
   completeLine: "The door is close, the street is visible, and there is a place to linger.",
   inhabitants: 2, world: { w: 9, h: 9 }, room: { x: 2, y: 1, w: 5, h: 3 },
   outdoorFurniture: true, street: "s",
@@ -48,15 +49,16 @@ const frontDoorBench: Level = {
       const threshold = door && exteriorCell(layout.room, door);
       const clearDoor = Boolean(door && threshold && indoorSet.has(cellKey(interiorCell(layout.room, door))) && floorSet.has(cellKey(threshold)));
       const placed = Boolean(bench && door && threshold && alongFacade(layout, bench, door.side) && manhattan(bench, threshold) > 0 && manhattan(bench, threshold) <= 2);
-      const view = Boolean(bench && !inRoom(layout.room, bench) && streetView(layout, bench, street));
+      const facesStreet = Boolean(bench && resolveFacing("front-door-bench", layout, bench).direction === street);
+      const view = Boolean(bench && facesStreet && !inRoom(layout.room, bench) && streetView(layout, bench, street));
       const component = reachable(floor, threshold ? [threshold] : []);
       const path = Boolean(clearDoor && placed && threshold && streetPaths.has(cellKey(threshold)) && bench && component.has(cellKey(step(bench, street))));
       const privacy = Boolean(bench && greens.some((green) => manhattan(green, bench) === 1 && !sameCell(green, step(bench, street))));
       const checks = [
         rule("door", "A clear doorway, inside and out", 20, clearDoor, clearDoor ? "Both sides of the doorway are free to walk through." : "Keep a door and leave its inside and outside threshold empty or paved, not occupied by furniture or planting."),
         rule("bench", "A bench beside the same doorway", 20, placed, placed ? "The bench stands against the door's facade, within two steps and off the threshold." : "Place the bench immediately alongside the house on the same wall as the door, within two cardinal steps of its outside tile. Keep the threshold free."),
-        rule("view", "An unblocked view of the street", 20, view, view ? "The bench has a clear line to the south street." : "Leave a straight view south from the bench to the street band. Trees, hedges and the building block it; turning the bench does not change the rule."),
-        rule("path", "A stone route and a bench approach", 20, path, path ? "Connected stones reach from the south edge to the threshold, and a clear walk reaches the front of the bench." : "Join the south edge to the outside threshold with actual path stones, including both endpoints. From that route, leave a clear walk to the tile south of the bench."),
+        rule("view", "Face the street with a clear view", 20, view, view ? "The bench faces the street along a clear sight line." : bench && !facesStreet ? `Use Rotate → Bench → Auto or ${FACING_LABELS[street]} to face the street. Keep its front clear; path stones are fine.` : "Keep a straight view from the bench to the street band. Trees, hedges and the building block it."),
+        rule("path", "A stone route and a bench approach", 20, path, path ? "Connected stones reach from the south edge to the threshold, and a clear walk reaches the front of the bench." : "Put a stone directly outside the door and one on the street strip itself. Join them with edge-touching stones, then leave a clear walk to the front of the bench; that last walk may be grass."),
         rule("privacy", "A planted private edge", 20, privacy, privacy ? "Greenery beside or behind the bench marks a small private edge." : "Add a plant, tree or hedge immediately beside or behind the bench, not in its south-facing opening. A diagonal planting is not a boundary."),
       ];
       return { checks, attractors: bench && checks.every((check) => check.ratio === 1) ? asCells([bench]) : [] };
@@ -133,7 +135,7 @@ const outdoorRoom: Level = {
       })).reached;
       const checks = [
         rule("room", "A table with room for a 5×5 frame", 15, fits, fits ? "The table centers a full 5×5 footprint, with a 3×3 furnished interior." : "Place the table at least two tiles from every plot edge so the full hedge frame fits around it."),
-        rule("walls", "Three whole sides made of hedge", 35, fits ? completeSides / 3 : 0, completeSides >= 3 && fits ? `${completeSides} complete sides define the corners of an outdoor room.` : "Build three full five-tile hedge sides, two tiles from the table. Shared corners mean at least 13 hedge tiles; scattered plants do not make walls."),
+        rule("walls", "Three 5-tile hedge sides around the table", 35, fits ? completeSides / 3 : 0, completeSides >= 3 && fits ? `${completeSides} complete sides define the corners of an outdoor room.` : `${completeSides} of 3 sides complete. Center a 5×5 outer frame on the table: each wall sits two tiles away, with one inner tile between the table and hedge. Each full side has 5 hedges including shared corners; a U uses 13. A larger enclosure does not count in this puzzle.`),
         rule("seats", "At least two seats inside the room", 20, inside.length / Math.max(2, seats.length), `${inside.length} of ${Math.max(2, seats.length)} seats sit in the inner 3×3 area around this table. All placed seats must belong to this room.`),
         rule("entrance", "An entrance from the surrounding garden", 15, entrances.length > 0, entrances.length > 0 ? "A clear gap in the frame connects the interior to a walk from the plot edge." : "Leave an unoccupied opening through the fourth side with free floor immediately inside. Reach it from the plot edge through free floor outside, or put the opening on that edge. Four closed sides seal the room."),
         rule("access", "Every seat joins the same open floor", 15, shared.length / Math.max(2, seats.length), shared.length >= 2 && shared.length === seats.length ? "All seats have a cardinal approach from one shared inner-floor area reached through the entrance." : "Leave a connected patch of free inner floor from the entrance to a side of every chair. Do not box in a seat or split the interior with furniture."),

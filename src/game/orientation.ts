@@ -46,7 +46,8 @@ function safeFront(layout: Layout, piece: CellPiece, direction: Side, viewWindow
   if (outdoor && indoor(layout, next)) return false;
   const obstacle = cellPieces(layout).find((other) => sameCell(other, next));
   if (!obstacle) return true;
-  if (piece.kind === "gate") return obstacle.kind === "path";
+  if (obstacle.kind === "path") return true;
+  if (piece.kind === "gate") return false;
   if (piece.kind === "shelf") return obstacle.kind === "seat";
   return obstacle.kind === "seat" || obstacle.kind === "bench" || obstacle.kind === "table" || obstacle.kind === "desk" || obstacle.kind === "hearth";
 }

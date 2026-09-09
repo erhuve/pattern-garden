@@ -110,15 +110,39 @@ with sync_playwright() as p:
             assert not any(page.evaluate(measure).values()), (size,slug,page.evaluate(measure))
             screenshot(f'{slug}-{size[0]}x{size[1]}')
             if slug == 'front-door-bench':
+                page.get_by_role('button', name=re.compile('^Path stone,')).click()
+                tap_cell(3, 5)
+                assert any(p.get('kind') == 'path' and p.get('x') == 3 and p.get('y') == 5 for p in saved(slug))
+                expect(page.locator('[data-facing-cell="3,4"]')).to_have_attribute('data-facing', 's')
+                expect(page.locator('.pg-score-value span')).to_have_text('100')
                 page.get_by_role('button', name='Remove', exact=True).click()
+                tap_cell(3, 5)
+                assert not any(p.get('kind') == 'path' and p.get('x') == 3 and p.get('y') == 5 for p in saved(slug))
+                expect(page.locator('[data-facing-cell="3,4"]')).to_have_attribute('data-facing', 's')
                 surface = page.evaluate('''()=>{const s=document.querySelector('.pg-board'),p=s.createSVGPoint();p.x=-37.429;p.y=101.083;const q=p.matrixTransform(s.getScreenCTM());return document.elementFromPoint(q.x,q.y)?.closest('[data-piece-cell]')?.getAttribute('data-piece-cell')}''')
                 assert surface == '3,4', ('exterior bench painted behind facade', surface)
+                before_rotation = saved(slug)
                 page.get_by_role('button', name='Rotate', exact=True).click()
                 page.get_by_role('button', name=re.compile('^Bench · column')).click()
                 page.get_by_role('button', name='Face upper right', exact=True).click()
                 page.get_by_role('button', name='Close explanation', exact=True).click()
-                expect(page.locator('.pg-score-value span')).to_have_text('100')
+                expect(page.locator('.pg-score-value span')).to_have_text('80')
+                expect(page.locator('.pg-celebration')).to_have_count(0)
                 expect(page.locator('[data-facing-cell="3,4"]')).to_have_attribute('data-facing', 'n')
+                page.reload()
+                expect(page.locator('.pg-score-value span')).to_have_text('80')
+                expect(page.locator('[data-facing-cell="3,4"]')).to_have_attribute('data-facing', 'n')
+                assert page.evaluate('(slug)=>JSON.parse(localStorage.getItem("pattern-garden:v1")).best[slug]', slug) == 100
+                assert [{k: v for k, v in piece.items() if k != 'facing'} for piece in saved(slug)] == before_rotation
+                page.get_by_role('button', name='Rotate', exact=True).click()
+                page.get_by_role('button', name=re.compile('^Bench · column')).click()
+                expect(page.get_by_role('dialog')).to_contain_text('must face the street')
+                page.get_by_role('button', name=re.compile('^Auto')).click()
+                page.get_by_role('button', name='Close explanation', exact=True).click()
+                expect(page.locator('.pg-score-value span')).to_have_text('100')
+                expect(page.locator('[data-facing-cell="3,4"]')).to_have_attribute('data-facing', 's')
+                assert saved(slug) == before_rotation
+                assert page.evaluate('(slug)=>JSON.parse(localStorage.getItem("pattern-garden:v1")).best[slug]', slug) == 100
             if slug == 'tree-places':
                 assert page.locator('[data-shade-cell]').count() > 0
                 page.get_by_role('button', name='Daylight', exact=True).click()

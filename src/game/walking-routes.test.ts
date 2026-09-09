@@ -79,7 +79,7 @@ describe("new places and movement", () => {
     expect(routeBetween(layout, from, to)).toBeNull();
   });
 
-  test("bench auto faces the street, desk chair faces its work, and manual direction stays decorative", () => {
+  test("bench auto faces the street and desk chair faces its work; only bench facing affects score", () => {
     for (const [slug, kind, direction] of [["front-door-bench", "bench", "s"], ["workspace-enclosure", "seat", "s"]] as const) {
       const layout = layoutFor(slug);
       const piece = cellPieces(layout).find(p => p.kind === kind)!;
@@ -88,7 +88,7 @@ describe("new places and movement", () => {
       const fixed = manual.find(p => p.kind === kind) as CellPiece;
       expect(resolveFacing(slug, { ...layout, pieces: manual }, fixed).direction).toBe("w");
       const level = EXPANDED_LEVELS.find(l => l.slug === slug)!;
-      expect(evaluate(level, { ...layout, pieces: manual }).score).toBe(100);
+      expect(evaluate(level, { ...layout, pieces: manual }).score).toBe(slug === "front-door-bench" ? 80 : 100);
     }
   });
 });
