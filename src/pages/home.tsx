@@ -16,7 +16,7 @@ export default function Home() {
         <p className="pg-eyebrow">a game of places, after Christopher Alexander</p>
         <h1>Pattern Garden</h1>
         <p className="pg-lede">
-          Each level is one pattern from <em>A Pattern Language</em>. You are given a small room and a
+          Each level is one pattern from <em>A Pattern Language</em>. You are given a small room or garden and a
           handful of pieces. Arrange them until the pattern is fully alive — and watch who comes to sit.
         </p>
         <div className="pg-hero-row">

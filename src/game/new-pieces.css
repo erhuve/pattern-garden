@@ -1,0 +1,67 @@
+.pg-desk-top {
+  fill: var(--pg-wood-light);
+  stroke: var(--pg-wood-dark);
+  stroke-width: 0.6;
+  stroke-linejoin: round;
+}
+.pg-desk-edge, .pg-desk-leg {
+  fill: var(--pg-wood);
+}
+.pg-desk-leg-side {
+  fill: var(--pg-wood-dark);
+}
+.pg-desk-notebook {
+  fill: var(--pg-paper);
+  stroke: var(--pg-wood-dark);
+  stroke-width: 0.55;
+  stroke-linejoin: round;
+}
+.pg-desk-fold, .pg-desk-writing, .pg-desk-pencil {
+  fill: none;
+  stroke: var(--pg-ink-3);
+  stroke-width: 0.5;
+  stroke-linecap: round;
+}
+.pg-desk-writing {
+  opacity: 0.65;
+}
+.pg-desk-pencil {
+  stroke: var(--pg-clay);
+  stroke-width: 1;
+}
+.pg-hedge-front, .pg-hedge-side, .pg-hedge-top {
+  stroke: var(--pg-moss);
+  stroke-width: 0.6;
+  stroke-linejoin: round;
+}
+.pg-hedge-front, .pg-hedge-side {
+  fill: var(--pg-moss);
+}
+.pg-hedge-side {
+  filter: brightness(.85);
+}
+.pg-hedge-top {
+  fill: var(--pg-moss-2);
+}
+.pg-hedge-twig, .pg-hedge-leaf, .pg-hedge-crown {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.pg-hedge-twig {
+  stroke: var(--pg-wood-dark);
+  stroke-width: 1.2;
+}
+.pg-hedge-leaf {
+  stroke: var(--pg-moss-2);
+  stroke-width: 1.1;
+  opacity: 0.65;
+}
+.pg-hedge-crown {
+  stroke: var(--pg-moss);
+  stroke-width: 0.8;
+  opacity: 0.5;
+}
+.pg-new-piece-detail {
+  pointer-events: none;
+}

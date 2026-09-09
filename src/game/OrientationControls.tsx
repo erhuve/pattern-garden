@@ -8,7 +8,7 @@ export function OrientationControls({ slug, layout, piece, onChange }: {
 }) {
   const current = resolveFacing(slug, layout, piece);
   const auto = automaticFacing(slug, layout, piece);
-  const kind = piece.kind === "shelf" || piece.kind === "gate" ? piece.kind : "seat";
+  const kind = piece.kind === "shelf" || piece.kind === "gate" || piece.kind === "bench" ? piece.kind : "seat";
   return <div className="pg-orientation">
     <p>Auto follows the room as you build. Choose a fixed direction if you want something different. Direction does not change your score.</p>
     <button type="button" className="pg-auto-facing" aria-pressed={!isFacing(piece.facing)} onClick={() => onChange("auto")}>

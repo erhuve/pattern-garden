@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ArrowRight, X } from "lucide-react";
 import { Board, type Target } from "@/game/Board";
@@ -42,10 +42,10 @@ function PlayLevel({ idx }: { idx: number }) {
   const [showLight, setShowLight] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [dialog, setDialog] = useState<{ kind: "about" } | { kind: "check"; id: string } | { kind: "orientation"; cell: Cell } | { kind: "objects" } | { kind: "remove-window"; target: Extract<Target, { type: "wall" }> } | null>(null);
-  const [people, setPeople] = useState<Inhabitant[]>(() => spawn({ world: level.world, room: level.room, pieces: [] }, level.inhabitants));
+  const [people, setPeople] = useState<Inhabitant[]>(() => spawn({ ...level, pieces }, level.inhabitants));
 
-  const layout: Layout = { world: level.world, room: level.room, pieces };
-  const evaluation = evaluate(level, layout);
+  const layout = useMemo<Layout>(() => ({ ...level, pieces }), [level, pieces]);
+  const evaluation = useMemo(() => evaluate(level, layout), [level, layout]);
   const pattern = PATTERNS.find((p) => p.number === level.number);
   const next = LEVELS[idx + 1];
   const prev = LEVELS[idx - 1];
@@ -62,6 +62,7 @@ function PlayLevel({ idx }: { idx: number }) {
     attractorsRef.current = evaluation.attractors;
   });
   const attractorsKey = evaluation.attractors.map((c) => `${c.x},${c.y}`).join("|");
+  const obstacleKey = level.obstacleAware ? JSON.stringify(pieces.map(({ facing: _facing, ...piece }: Piece & { facing?: unknown }) => piece)) : "";
   useEffect(() => {
     let raf = 0;
     let last = performance.now();
@@ -83,7 +84,7 @@ function PlayLevel({ idx }: { idx: number }) {
     setPeople((ps) => retarget(layoutRef.current, ps, attractorsRef.current, rng.current));
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [attractorsKey, pieces.length, level.slug]);
+  }, [attractorsKey, pieces.length, level.slug, obstacleKey]);
 
   function handleTarget(t: Target) {
     setMessage(null);
@@ -91,7 +92,7 @@ function PlayLevel({ idx }: { idx: number }) {
     if (tool === "rotate") {
       const piece = t.type === "cell" ? pieces.find((p) => isDirectional(p) && p.x === t.x && p.y === t.y) : undefined;
       if (piece && isDirectional(piece)) setDialog({ kind: "orientation", cell: piece });
-      else setMessage("Tap a seat, shelf or gate to choose its direction. Other pieces do not need rotation.");
+      else setMessage("Tap a seat, bench, shelf or gate to choose its direction. Other pieces do not need rotation.");
       return;
     }
     if (tool === "erase") {
@@ -108,7 +109,7 @@ function PlayLevel({ idx }: { idx: number }) {
       return;
     }
     if (!wallKind && tool !== "plant" && t.type !== "cell") {
-      setMessage(`${PIECE_LABELS[tool]} goes on the floor — tap a tile inside the room.`);
+      setMessage(`${PIECE_LABELS[tool]} goes on the ground — tap a free tile.`);
       return;
     }
     if (usedInventory(pieces, tool) >= entry.max) {
@@ -125,7 +126,7 @@ function PlayLevel({ idx }: { idx: number }) {
   const explainedCheck = dialog?.kind === "check" ? evaluation.checks.find((check) => check.id === dialog.id) : undefined;
 
   return (
-    <main className="pg-play pg-workbench">
+    <main className={`pg-play pg-workbench${level.adaptation ? " pg-expanded" : ""}`}>
       <header className="pg-play-head">
         <Link to="/" className="pg-back" aria-label="All patterns"><ArrowLeft /><span>patterns</span></Link>
         <div className="pg-play-title">
@@ -162,7 +163,7 @@ function PlayLevel({ idx }: { idx: number }) {
             </div>
           )}
         </section>
-        <CriteriaPanel evaluation={evaluation} completeLine={level.completeLine}
+        <CriteriaPanel evaluation={evaluation} completeLine={level.completeLine} explainOnTap={Boolean(level.adaptation)}
           onNext={next ? () => navigate(`/play/${next.slug}`) : undefined}
           onExplain={(check) => setDialog({ kind: "check", id: check.id })} />
       </div>
@@ -181,7 +182,7 @@ function PlayLevel({ idx }: { idx: number }) {
                 {PIECE_LABELS[piece.kind]} · column {piece.x + 1}, row {piece.y + 1}
               </button>
             ))}
-            {!pieces.some(isDirectional) && <p>Place a seat, shelf or gate first. The other pieces do not need rotation.</p>}
+            {!pieces.some(isDirectional) && <p>Place a seat, bench, shelf or gate first. The other pieces do not need rotation.</p>}
           </div>
         ) : orientedPiece && isDirectional(orientedPiece) ? <OrientationControls slug={level.slug} layout={layout} piece={orientedPiece}
           onChange={(direction) => setPieces((ps) => setFacing(ps, orientedPiece, direction))} /> : explainedCheck ? (
@@ -192,6 +193,7 @@ function PlayLevel({ idx }: { idx: number }) {
         ) : (
           <>
             <p className="pg-quote">{level.quote}</p>
+            {level.adaptation && <p className="pg-adaptation"><strong>This puzzle’s interpretation.</strong> {level.adaptation}</p>}
             <p>Piece counters show used / available inventory. Extras are optional; the criteria determine when the pattern is complete.</p>
             {pattern && <p className="pg-meta">Pattern {pattern.number} · {pattern.section} · {pattern.subsection}{pattern.stars > 0 && <> · {"★".repeat(pattern.stars)}</>}</p>}
             <nav className="pg-dialog-nav" aria-label="Browse patterns">

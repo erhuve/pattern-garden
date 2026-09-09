@@ -9,7 +9,10 @@ export type CellPieceKind =
   | "path"
   | "gate"
   | "hearth"
-  | "shelf";
+  | "shelf"
+  | "bench"
+  | "desk"
+  | "hedge";
 export type PieceKind = WallPieceKind | CellPieceKind;
 
 export type WallPiece =
@@ -22,6 +25,10 @@ export type Piece = WallPiece | CellPiece;
 export type Rect = { x: number; y: number; w: number; h: number };
 
 export type Layout = {
+  setting?: "garden";
+  outdoorFurniture?: boolean;
+  obstacleAware?: boolean;
+  street?: Side;
   world: { w: number; h: number };
   room: Rect;
   pieces: Piece[];
@@ -53,6 +60,11 @@ export type Level = {
   title: string;
   tagline: string;
   quote: string;
+  adaptation?: string;
+  setting?: "garden";
+  outdoorFurniture?: boolean;
+  obstacleAware?: boolean;
+  street?: Side;
   completeLine: string;
   inhabitants: number;
   world: { w: number; h: number };
@@ -84,4 +96,7 @@ export const PIECE_LABELS: Record<PieceKind, string> = {
   gate: "Gate",
   hearth: "Hearth",
   shelf: "Shelf",
+  bench: "Bench",
+  desk: "Desk",
+  hedge: "Hedge",
 };

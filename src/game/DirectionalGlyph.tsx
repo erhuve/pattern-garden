@@ -1,7 +1,7 @@
 import { memo } from "react";
 import type { Side } from "./types";
 
-export type DirectionalKind = "seat" | "shelf" | "gate";
+export type DirectionalKind = "seat" | "shelf" | "gate" | "bench";
 type Box = { x: number; y: number; w: number; d: number; z: number; h: number; material: string };
 
 export function rotateXY(x: number, y: number, facing: Side) {
@@ -18,6 +18,17 @@ function model(kind: DirectionalKind, facing: Side): Box[] {
     { x: -0.31, y: -0.25, w: 0.62, d: 0.56, z: 0, h: 9, material: "pg-seat-side" },
     { x: -0.31, y: -0.25, w: 0.62, d: 0.56, z: 9, h: 2, material: "pg-seat" },
     { x: -0.32, y: -0.35, w: 0.64, d: 0.1, z: 0, h: 24, material: "pg-seat-back" },
+  ];
+  if (kind === "bench") return [
+    { x: -0.39, y: -0.25, w: 0.08, d: 0.08, z: 0, h: 21, material: "pg-wood" },
+    { x: 0.31, y: -0.25, w: 0.08, d: 0.08, z: 0, h: 21, material: "pg-wood" },
+    { x: -0.39, y: 0.15, w: 0.08, d: 0.08, z: 0, h: 9, material: "pg-wood-dark" },
+    { x: 0.31, y: 0.15, w: 0.08, d: 0.08, z: 0, h: 9, material: "pg-wood-dark" },
+    { x: -0.43, y: -0.16, w: 0.86, d: 0.12, z: 9, h: 2, material: "pg-wood-light" },
+    { x: -0.43, y: -0.02, w: 0.86, d: 0.12, z: 9, h: 2, material: "pg-wood-light" },
+    { x: -0.43, y: 0.13, w: 0.86, d: 0.12, z: 9, h: 2, material: "pg-wood-light" },
+    { x: -0.31, y: -0.25, w: 0.62, d: 0.08, z: 13, h: 3, material: "pg-wood-light" },
+    { x: -0.31, y: -0.25, w: 0.62, d: 0.08, z: 18, h: 3, material: "pg-wood-light" },
   ];
   if (kind === "gate") return [
     { x: -0.43, y: -0.07, w: 0.1, d: 0.14, z: 0, h: 29, material: "pg-wood" },
@@ -44,6 +55,15 @@ function model(kind: DirectionalKind, facing: Side): Box[] {
 
 export function orderedModel(kind: DirectionalKind, facing: Side): Box[] {
   const boxes = model(kind, facing);
+  if (kind === "bench") {
+    const order: Record<Side, number[]> = {
+      s: [0, 7, 8, 1, 2, 3, 4, 5, 6],
+      e: [1, 7, 8, 0, 3, 2, 4, 5, 6],
+      n: [3, 2, 6, 5, 4, 1, 7, 8, 0],
+      w: [2, 3, 6, 5, 4, 0, 7, 8, 1],
+    };
+    return order[facing].map(index => boxes[index]);
+  }
   if (kind === "seat") return facing === "s" || facing === "e" ? [boxes[2], boxes[0], boxes[1]] : boxes;
   if (kind === "gate" && (facing === "n" || facing === "e")) return [boxes[1], boxes[0], boxes[2]];
   return boxes;

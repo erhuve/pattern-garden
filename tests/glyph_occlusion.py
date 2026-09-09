@@ -45,4 +45,4 @@ for item in data:
                 bad.append((x, y, expected, hits[-1]))
     assert not bad, (item['kind'], item['facing'], len(bad), bad[:3])
     print(f"PASS: {item['kind']} {item['facing']} painter ordering matches ray geometry")
-print(f"PASS: {total} surface samples across all 12 directional views")
+print(f"PASS: {total} surface samples across all 16 directional views")

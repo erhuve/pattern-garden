@@ -4,7 +4,7 @@ import { DirectionalGlyph, orderedModel, rotateXY, type DirectionalKind } from "
 import { FACINGS } from "../src/game/orientation";
 
 const output = [];
-for (const kind of ["seat", "shelf", "gate"] as DirectionalKind[]) {
+for (const kind of ["seat", "shelf", "gate", "bench"] as DirectionalKind[]) {
   for (const facing of FACINGS) {
     const boxes = orderedModel(kind, facing).map((box) => {
       const corners = [rotateXY(box.x, box.y, facing), rotateXY(box.x + box.w, box.y + box.d, facing)];

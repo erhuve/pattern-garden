@@ -1,0 +1,9 @@
+.pg-street { fill: #a8a18f; stroke: #928c7c; stroke-width: 0.4; }
+.pg-street-mark { stroke: #e9e0c6; stroke-width: 1.5; pointer-events: none; }
+.pg-tree-shade { fill: #486c47; opacity: 0.22; pointer-events: none; }
+.pg-adaptation { border-left: 2px solid var(--pg-moss); padding-left: 14px; }
+@media (min-width: 761px) and (max-height: 780px) {
+  .pg-expanded .pg-check-explanation:not(.pg-success) { display: none; }
+}
+
+.pg-board.is-picking .pg-piece { pointer-events: visiblePainted; }

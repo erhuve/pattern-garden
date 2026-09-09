@@ -172,7 +172,7 @@ with sync_playwright() as p:
     expect(page.locator('.pg-board [data-facing-cell]')).to_have_count(0)
     assert stored("window-place") == []
     page.get_by_role("button", name="Rotate", exact=True).tap()
-    expect(page.locator("dialog")).to_contain_text("Place a seat, shelf or gate first")
+    expect(page.locator("dialog")).to_contain_text("Place a seat, bench, shelf or gate first")
     close()
     print("PASS: gate and window/shelf contexts, reset and empty chooser")
     assert not errors, errors

@@ -1,6 +1,8 @@
 import { useMemo, useRef, useState } from "react";
 import type { BoardTool, Cell, Evaluation, Layout, Level, PieceKind, Side, WallPiece } from "./types";
 import { DirectionalGlyph } from "./DirectionalGlyph";
+import { NewPieceGlyph } from "./NewPieceGlyph";
+import "./garden-board.css";
 import { resolveFacing } from "./orientation";
 import { alcoveAt, interiorCell, wallLength, type PlaceTarget } from "./geometry";
 import "./window-details.css";
@@ -31,6 +33,7 @@ function diamond(x: number, y: number, z = 0): string {
 type WallSeg = { side: Side; pos: number; a: P; b: P; front: boolean };
 
 function wallSegments(layout: Layout): WallSeg[] {
+  if (layout.setting === "garden") return [];
   const r = layout.room;
   const out: WallSeg[] = [];
   for (let i = 0; i < r.w; i++) {
@@ -175,13 +178,15 @@ export function Board({ level, layout, evaluation, people, tool, onTarget, showL
     const hit = document.elementFromPoint(e.clientX, e.clientY);
     const element = hit && e.currentTarget.contains(hit) ? hit : null;
     if (!element) return;
-    const paintedPiece = tool === "rotate" ? element?.closest<SVGGElement>("[data-piece-cell]") : null;
+    const paintedPiece = element?.closest<SVGGElement>("[data-piece-cell]");
     const paintedWall = !element?.classList.contains("pg-floor") ? element?.closest<SVGGElement>("[data-wall-surface]") : null;
     const wallKey = paintedWall?.dataset.wallSurface;
     const directWall: Target | null = wallKey ? { type: "wall", side: wallKey[0] as Side, pos: Number(wallKey.slice(1)) } : null;
     const sillPlant = element?.closest("[data-sill-plant]");
     const cell = paintedPiece?.dataset.pieceCell?.split(",").map(Number);
-    const t: Target | null = tool === "rotate"
+    const t: Target | null = cell && (tool === "erase" || tool === "plant")
+      ? { type: "cell", x: cell[0], y: cell[1] }
+      : tool === "rotate"
       ? cell ? { type: "cell", x: cell[0], y: cell[1] } : paintedWall ? null : resolveTarget(pt)
       : directWall && (wallTool || tool === "plant" || tool === "erase" || paintedWall?.querySelector("[data-full-door]"))
         ? tool === "erase" && sillPlant ? { ...directWall, type: "sill" } : directWall
@@ -193,14 +198,18 @@ export function Board({ level, layout, evaluation, people, tool, onTarget, showL
   const ground: React.ReactNode[] = [];
   for (let y = 0; y < world.h; y++)
     for (let x = 0; x < world.w; x++) {
-      const insideRoom = x >= room.x && x < room.x + room.w && y >= room.y && y < room.y + room.h;
+      const insideRoom = layout.setting !== "garden" && x >= room.x && x < room.x + room.w && y >= room.y && y < room.y + room.h;
       const inside = insideRoom || Boolean(alcoveAt(room, layout.pieces, { x, y }));
       const lit = inside && showLight ? lightCount(layout, { x, y }) : 0;
+      const street = layout.street === "s" && y === world.h - 1;
+      const shade = !inside && showLight && layout.outdoorFurniture && layout.pieces.some((p) => p.kind === "tree" && Math.max(Math.abs(p.x - x), Math.abs(p.y - y)) <= 1);
       const isA = attract.has(`${x},${y}`);
       const unhappy = unhappySeats.has(`${x},${y}`);
       ground.push(
         <g key={`c${x}-${y}`}>
-          <polygon points={diamond(x, y)} className={inside ? "pg-floor" : "pg-grass"} />
+          <polygon points={diamond(x, y)} className={inside ? "pg-floor" : street ? "pg-street" : "pg-grass"} data-ground-cell={`${x},${y}`} />
+          {street && <line x1={iso(x + 0.3, y + 0.5).x} y1={iso(x + 0.3, y + 0.5).y} x2={iso(x + 0.7, y + 0.5).x} y2={iso(x + 0.7, y + 0.5).y} className="pg-street-mark" />}
+          {shade && <polygon points={diamond(x, y)} className="pg-tree-shade" data-shade-cell={`${x},${y}`} />}
           {lit > 0 && <polygon points={diamond(x, y)} className="pg-light" style={{ opacity: Math.min(0.55, 0.22 * lit) }} />}
           {unhappy && <polygon points={diamond(x, y)} className="pg-unhappy" />}
           {isA && <polygon points={diamond(x, y)} className="pg-attract" />}
@@ -217,6 +226,10 @@ export function Board({ level, layout, evaluation, people, tool, onTarget, showL
 
   const backWalls = segs.filter((s) => !s.front);
   const frontWalls = segs.filter((s) => s.front);
+  const inFrontOfHouse = (cell: Cell) => layout.outdoorFurniture && layout.setting !== "garden" &&
+    (cell.x >= room.x + room.w || cell.y >= room.y + room.h);
+  const renderPiece = (p: Layout["pieces"][number], i: number) => "side" in p ? [] :
+    [<PieceGlyph key={`p${i}`} kind={p.kind} x={p.x} y={p.y} facing={facings.get(`${p.x},${p.y}`)?.direction} manual={facings.get(`${p.x},${p.y}`)?.manual} />];
 
   function renderWall(seg: WallSeg) {
     const piece = wallMap.get(`${seg.side}${seg.pos}`);
@@ -275,7 +288,7 @@ export function Board({ level, layout, evaluation, people, tool, onTarget, showL
     <svg
       ref={svgRef}
       viewBox={`${minX} ${minY} ${maxX - minX} ${maxY - minY}`}
-      className={`pg-board ${tool === "rotate" ? "is-rotating" : ""}`}
+      className={`pg-board ${tool === "rotate" ? "is-rotating" : ""} ${tool === "erase" || tool === "plant" ? "is-picking" : ""}`}
       role="img"
       aria-label={`${level.title} board`}
       onPointerMove={(e) => {
@@ -302,14 +315,14 @@ export function Board({ level, layout, evaluation, people, tool, onTarget, showL
       <g>{ground}</g>
       <g>{backWalls.map(renderWall)}</g>
       <g>
-        {sortedPieces.flatMap((p, i) =>
-          "side" in p ? [] : [<PieceGlyph key={`p${i}`} kind={p.kind} x={p.x} y={p.y} facing={facings.get(`${p.x},${p.y}`)?.direction} manual={facings.get(`${p.x},${p.y}`)?.manual} />],
-        )}
-        {people.map((h) => (
-          <Person key={h.id} p={h} />
-        ))}
+        {sortedPieces.filter((p) => "side" in p || !inFrontOfHouse(p)).flatMap(renderPiece)}
+        {people.filter((h) => !inFrontOfHouse(h)).map((h) => <Person key={h.id} p={h} />)}
       </g>
       <g>{frontWalls.map(renderWall)}</g>
+      <g data-front-exterior>
+        {sortedPieces.filter((p) => !("side" in p) && inFrontOfHouse(p)).flatMap(renderPiece)}
+        {people.filter(inFrontOfHouse).map((h) => <Person key={h.id} p={h} />)}
+      </g>
     </svg>
   );
 }
@@ -333,11 +346,12 @@ function AlcoveBay({ seg, h, shade }: { seg: WallSeg; h: number; shade: string }
 
 export function PieceGlyph({ kind, x, y, facing = "s", manual = false }: { kind: PieceKind; x: number; y: number; facing?: Side; manual?: boolean }) {
   const c = iso(x + 0.5, y + 0.5);
-  if (kind === "seat" || kind === "shelf" || kind === "gate") {
+  if (kind === "seat" || kind === "bench" || kind === "shelf" || kind === "gate") {
     return <g transform={`translate(${c.x} ${c.y})`} className="pg-piece" data-piece-cell={`${x},${y}`} data-facing-cell={`${x},${y}`} data-facing={facing} data-facing-mode={manual ? "manual" : "auto"} data-kind={kind}>
       <DirectionalGlyph kind={kind} facing={facing} />
     </g>;
   }
+  if (kind === "desk" || kind === "hedge") return <NewPieceGlyph kind={kind} x={x} y={y} />;
   switch (kind) {
     case "table":
       return (

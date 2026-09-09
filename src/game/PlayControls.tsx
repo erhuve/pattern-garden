@@ -47,8 +47,9 @@ function checkStatus(check: CheckResult) {
   return check.ratio >= 1 ? "Met" : check.ratio > 0 ? "Partly met" : "Not yet met";
 }
 
-export function CriteriaPanel({ evaluation, onExplain, completeLine, onNext }: {
+export function CriteriaPanel({ evaluation, onExplain, completeLine, onNext, explainOnTap = false }: {
   evaluation: Evaluation;
+  explainOnTap?: boolean;
   onExplain: (check: CheckResult) => void;
   completeLine: string;
   onNext?: () => void;
@@ -73,7 +74,7 @@ export function CriteriaPanel({ evaluation, onExplain, completeLine, onNext }: {
               aria-pressed={check.id === selected?.id}
               onClick={() => {
                 setSelectedId(check.id);
-                if (window.matchMedia("(max-width: 760px), (max-height: 600px)").matches || evaluation.score === 100) onExplain(check);
+                if (window.matchMedia("(max-width: 760px), (max-height: 600px)").matches || explainOnTap && window.matchMedia("(max-height: 780px)").matches || evaluation.score === 100) onExplain(check);
               }}>
               <span className="pg-check-mark" aria-hidden="true">
                 {check.ratio >= 1 ? <Check /> : <i style={{ ["--r" as string]: check.ratio }} />}
@@ -118,7 +119,7 @@ export function BoardTools({ level, pieces, tool, onTool, showLight, onLight, on
       <div className="pg-board-palette" role="group" aria-label="Building pieces. Counts show used inventory; extras are optional." style={{ ["--piece-total" as string]: level.palette.length + 2 }}>
         {level.palette.map((entry) => {
           const used = usedInventory(pieces, entry.kind);
-          const surface = entry.kind === "plant" ? "floor or window sill" : WALL_KINDS.has(entry.kind) ? "wall" : "floor";
+          const surface = level.setting === "garden" ? "garden ground" : entry.kind === "bench" || entry.kind === "hedge" || entry.kind === "tree" || entry.kind === "path" || entry.kind === "gate" ? "outside ground" : entry.kind === "plant" ? "floor or window sill" : WALL_KINDS.has(entry.kind) ? "wall" : "floor";
           return (
             <button key={entry.kind} type="button"
               className={`pg-tool pg-piece-tile ${tool === entry.kind ? "is-active" : ""} ${used >= entry.max ? "is-spent" : ""}`}
@@ -137,10 +138,10 @@ export function BoardTools({ level, pieces, tool, onTool, showLight, onLight, on
       </div>
       <p className="pg-placement-hint" aria-live="polite" aria-atomic="true">
         <strong>{tool === "rotate" ? "Rotate" : tool === "erase" ? "Remove" : tool ? PIECE_LABELS[tool] : "Select a piece"}</strong>
-        <span>{tool === "rotate" ? "Tap a seat, shelf or gate" : tool === "erase" ? "Tap a piece; planted windows give you a choice" : tool === "plant" ? "Tap a window sill or a floor tile" : tool && WALL_KINDS.has(tool) ? "Tap a wall" : "Tap a floor tile"}</span>
+        <span>{tool === "rotate" ? "Tap a seat, bench, shelf or gate" : tool === "erase" ? "Tap a piece; planted windows give you a choice" : tool === "plant" ? "Tap a window sill or a floor tile" : tool && WALL_KINDS.has(tool) ? "Tap a wall" : level.setting === "garden" || tool === "bench" || tool === "hedge" ? "Tap a free garden tile" : "Tap a floor tile"}</span>
       </p>
       <div className="pg-board-actions" role="group" aria-label="Board controls">
-        <button type="button" className={`pg-icon-button ${showLight ? "is-on" : ""}`} onClick={onLight} aria-pressed={showLight} aria-label="Daylight" title="Show daylight"><Lightbulb aria-hidden="true" /></button>
+        <button type="button" className={`pg-icon-button ${showLight ? "is-on" : ""}`} onClick={onLight} aria-pressed={showLight} aria-label="Daylight" title={level.outdoorFurniture ? "Show tree shade and daylight" : "Show daylight"}><Lightbulb aria-hidden="true" /></button>
         <button type="button" className="pg-icon-button" onClick={onReset} aria-label="Reset" title="Reset this layout"><RotateCcw aria-hidden="true" /></button>
         <button type="button" className="pg-icon-button" onClick={onInfo} aria-label="About this pattern" title="About this pattern"><Info aria-hidden="true" /></button>
       </div>

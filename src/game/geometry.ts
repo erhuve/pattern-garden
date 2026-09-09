@@ -147,12 +147,17 @@ export function usedInventory(pieces: Piece[], kind: PieceKind): number {
   return pieces.filter((p) => p.kind === kind).length + (kind === "plant" ? pieces.filter((p) => p.kind === "window" && p.sillPlant === true).length : 0);
 }
 
-const OUTDOOR_KINDS = new Set<PieceKind>(["tree", "path", "gate"]);
-const INDOOR_KINDS = new Set<PieceKind>(["seat", "table", "shelf", "hearth"]);
+const OUTDOOR_KINDS = new Set<PieceKind>(["tree", "path", "gate", "bench", "hedge"]);
+const INDOOR_KINDS = new Set<PieceKind>(["seat", "table", "shelf", "hearth", "desk"]);
+
+export function indoorCell(layout: Pick<Layout, "room" | "setting" | "pieces">, c: Cell): boolean {
+  return layout.setting !== "garden" && (inRoom(layout.room, c) || Boolean(alcoveAt(layout.room, layout.pieces, c)));
+}
 
 export function placeAt(level: Level, pieces: Piece[], kind: PieceKind, t: PlaceTarget): Piece[] | string {
   const limit = level.palette.find((entry) => entry.kind === kind)?.max ?? 0;
-  if (kind === "plant" && usedInventory(pieces, kind) >= limit) return "All your plants are already placed.";
+  if (limit <= 0) return "That piece is not available in this level.";
+  if (usedInventory(pieces, kind) >= limit) return `All your ${kind === "plant" ? "plants" : "pieces of this kind"} are already placed.`;
   if (kind === "plant" && t.type !== "cell") {
     const window = pieces.find((p) => p.kind === "window" && p.side === t.side && p.pos === t.pos);
     if (!window || window.kind !== "window") return "Put a plant on a floor tile or an existing window sill.";
@@ -161,6 +166,7 @@ export function placeAt(level: Level, pieces: Piece[], kind: PieceKind, t: Place
   }
   if (t.type === "sill") return "Only a plant goes on a window sill.";
   if (t.type === "wall") {
+    if (level.setting === "garden") return "This garden has no building walls.";
     if (!isWallKind(kind)) return "That piece belongs on the floor.";
     if (t.pos < 0 || t.pos >= wallLength(level.room, t.side)) return "That is not part of the room's wall.";
     const existing = pieces.find((p) => isWallPiece(p) && p.side === t.side && p.pos === t.pos);
@@ -170,9 +176,9 @@ export function placeAt(level: Level, pieces: Piece[], kind: PieceKind, t: Place
   if (isWallKind(kind)) return "That piece belongs on a wall.";
   const c = { x: t.x, y: t.y };
   if (!inWorld(level.world, c)) return "Off the edge of the world.";
-  const inside = inRoom(level.room, c) || Boolean(alcoveAt(level.room, pieces, c));
+  const inside = indoorCell({ ...level, pieces }, c);
   if (OUTDOOR_KINDS.has(kind) && inside) return `A ${kind} belongs outside the room.`;
-  if (INDOOR_KINDS.has(kind) && !inside) return `A ${kind} belongs inside the room.`;
+  if (INDOOR_KINDS.has(kind) && !inside && !(level.outdoorFurniture && (kind === "seat" || kind === "table"))) return `A ${kind} belongs inside the room.`;
   const existing = pieces.find((p) => isCellPiece(p) && p.x === c.x && p.y === c.y);
   if (existing) return `There is already a ${existing.kind} there. Remove it first.`;
   return [...pieces, { kind, x: c.x, y: c.y } as CellPiece];

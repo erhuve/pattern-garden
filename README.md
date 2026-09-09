@@ -11,13 +11,13 @@ Design decisions agreed with Miku (Sept 2026):
 - **Web only.** Vite + React SVG isometric renderer. No 3D engine.
 - **Hybrid feel.** Charming miniature places, but governed by legible, deterministic puzzle rules.
 - **Scoring is rule-based; inhabitants are the payoff.** Each level defines explicit weighted checks (e.g. "windows on two different sides", "the path changes direction"). Score = weighted ratio of checks passed, but 100% is reserved for layouts where every check has a full ratio so rounding can never trigger a false completion. Light on Two Sides requires both supplied seats to receive cross-light from windows on two different walls before it can reach 100%. Palette counts are inventory limits, not requirements; spare pieces may remain unused. Tiny inhabitants wander the room and gravitate toward the cells the pattern marks as *attractors*; when they arrive they become "content" (music note). They never affect score.
-- **Handful of quality levels first.** Five building-scale patterns are playable (159 Light on Two Sides of Every Room, 112 Entrance Transition, 180 Window Place, 179 Alcoves, 185 Sitting Circle). All 253 patterns are shown on the home page; unbuilt ones are locked. The data model (`Level`) is generic so more can be added as pure data + an `evaluate` function.
+- **Handful of quality levels first.** Nine patterns are playable: the original five (159 Light on Two Sides of Every Room, 112 Entrance Transition, 180 Window Place, 179 Alcoves, 185 Sitting Circle), plus 242 Front Door Bench, 171 Tree Places, 163 Outdoor Room and 183 Workspace Enclosure. All 253 patterns appear on the home page; unbuilt ones are locked. New levels explicitly distinguish the book's ideas from the exact tile-based puzzle interpretation in About.
 
 ### Structure
 
 - `src/data/apl.json` — all 253 patterns (number, title, section, subsection, stars) plus the 1858 cross-reference edges. Derived from BeksOmega/pattern-language-graph GraphML; two duplicate numbers in the source (73→75 The Family, 201→211 Thickening the Outer Walls) were corrected by hand.
 - `src/game/types.ts` — `Piece` (wall pieces live on a room side+pos; cell pieces live on a grid cell), `Layout`, `Level`, `Check`.
-- `src/game/levels.ts` — the five levels, each with `problem` / `therefore` text (paraphrased from the book), a palette with max counts, and an `evaluate(layout)` returning checks + attractor cells. `evaluate(level, layout)` computes the 0–100 score.
+- `src/game/levels.ts` — the original five levels and combined nine-level registry. `expanded-levels.ts` holds the four additions, with paraphrased context, explicit puzzle adaptations, palette limits and `evaluate(layout)` returning checks + attractors. `evaluate(level, layout)` computes the 0–100 score.
 - `src/game/geometry.ts` — grid helpers, `placeAt` / `removeAt` with placement rules (indoor vs outdoor pieces, wall vs floor, occupancy). Alcoves extend the room by one usable recessed floor cell; attached furniture is removed with the alcove.
 - `src/game/inhabitants.ts` — spawn / retarget / step for the little people. Blocking furniture is not walkable.
 - `src/game/Board.tsx` — SVG isometric renderer. Back walls full height, front walls knee-high so the interior stays visible. Hit targets carry `data-cell="x,y"` and `data-wall="<side><pos>"` for testing.
@@ -29,7 +29,24 @@ Design decisions agreed with Miku (Sept 2026):
 
 ### Adding a level
 
-Add a `Level` object to `src/game/levels.ts` and include it in `LEVELS`. Checks should each carry a plain-language `detail` for both the pass and fail state, and the level must be solvable to exactly 100% with its palette — verify with a quick script that calls `evaluate` on a known-good layout.
+Add a `Level` object to a level module and include it in `LEVELS` (`expanded-levels.ts` exports the four additions). Give every check clear pass/fail detail and a known-good layout built legally through `placeAt`. Verify removal, obstruction, order independence, shared-candidate matching and current score vs historical best. Test desktop/phone placement, completion, reload, reset and criterion explanations. Preserve the existing five patterns and saved coordinates.
+
+### Four additional places
+
+- **Front Door Bench (242):** a bench on the entrance facade, off the threshold, a clear view toward the visible south street, a continuous stone path, and a planted private edge. All checks concern the same bench and door.
+- **Tree Places (171):** the grove variant: at least three trees around one usable clearing, two benches sharing that clearing and simplified canopy shade, with a connected walk from the plot edge to both. A disconnected pair of groves cannot combine their scores. Paths and plants are optional.
+- **Outdoor Room (163):** a table-centered 5×5 hedge footprint, three complete sides, at least two seats in the 3×3 interior, and an accessible entrance joining every seat to the same free-floor component. Closing all four sides fails. Exact dimensions are game rules, not architectural doctrine.
+- **Workspace Enclosure (183):** a desk/chair pair with a protected back and side, two free forward tiles opening into common space, a real visible front/side window, and circulation from the door. Windows contribute half enclosure but never count as walking openings. Rotation remains decorative.
+
+`expanded-solutions.ts` supplies tested example layouts, not automatic player solutions. `place-rules.ts` provides strict cardinal flood-fill without inventing blocked endpoints. New pieces are a one-cell slatted bench (four orientations), a symmetric desk with notebook, and a low leafy hedge. `NewPieceGlyph.tsx`, `new-pieces.css` and `DirectionalGlyph.tsx` contain their artwork; all use existing theme colors and no new dependencies.
+
+`Level`/`Layout.setting = "garden"` removes the building walls and indoor floor without faking a giant room. `outdoorFurniture` permits seats/tables outdoors only in the added outdoor levels. `street` marks the entrance puzzle's south edge. These options must be propagated with the layout; legacy levels omit them. Shared placement enforces inventory, surface and occupancy rules. Floor and sill plants still share inventory.
+
+The four added levels set `obstacleAware` independently of furniture presence. Their inhabitants use `walking-routes.ts` cardinal routes around trees, hedges and furniture, entering houses only through doors. Board edits invalidate their routes before subsequent movement. Original-level motion is unchanged. Benches face the street or nearby seating; workspace chairs favor their desks. Southern/eastern exterior pieces render after the facade, while indoor pieces remain behind it. Remove/Plant use the visible furniture surface rather than a window hidden underneath.
+
+Pattern references: [Front Door Bench](https://patternlanguage.cc/Patterns/Front-Door-Bench-(242)), [Tree Places](https://patternlanguage.cc/Patterns/Tree-Places-(171)), [Outdoor Room](https://patternlanguage.cc/Patterns/Outdoor-Room-(163)), [Workspace Enclosure](https://patternlanguage.cc/Patterns/Workspace-Enclosure-(183)). The new descriptions are paraphrases, not quotations; About lists deliberate simplifications.
+
+`tests/expanded_levels.py` plays all four from reset to 100% with real touch on desktop and phone and checks 40 viewport/level combinations, inventory, garden rendering, bench occlusion, reload, reset, rotation, shade and About. Unit coverage includes all four legal solutions, incomplete/blocked layouts, no mutation, insertion-order invariance, movement and four-view bench occlusion. Run alongside the existing layout, orientation, completion and window suites.
 
 
 ---
@@ -81,10 +98,11 @@ python3 tests/play_layout.py --build-dir dist
 python3 tests/completion_celebration.py --build-dir dist
 python3 tests/orientation.py --build-dir dist
 python3 tests/window_details.py --build-dir dist
+python3 tests/expanded_levels.py --build-dir dist
 python3 tests/glyph_occlusion.py
 ```
 
-The browser suite requires Python Playwright and Chromium (`python3 -m pip install playwright` and `python3 -m playwright install chromium`). `--build-dir` tests an isolated build through intercepted browser requests without a server; `--base-url` tests a running deployment in a fresh browser profile. `--screenshots <directory>` saves desktop, phone, landscape and completion evidence. The suite checks all five levels across ten viewport sizes, text/320px fallbacks, modal focus, actual touch placement/removal, score persistence and level navigation. It also checks icon squares and corner counters, full-height stage layout, control/board separation, palette hit targets, touch/keyboard selection without accidental placement, and used inventory updates through placement/removal/reload.
+The browser suite requires Python Playwright and Chromium (`python3 -m pip install playwright` and `python3 -m playwright install chromium`). `--build-dir` tests an isolated build through intercepted browser requests without a server; `--base-url` tests a running deployment in a fresh browser profile. `--screenshots <directory>` saves desktop, phone, landscape and completion evidence. The original layout suite checks five levels across ten viewport sizes; the expanded suite adds four levels across ten sizes. Coverage includes text/320px fallbacks, modal focus, actual touch placement/removal, score persistence and level navigation. It also checks icon squares and corner counters, full-height stage layout, control/board separation, palette hit targets, touch/keyboard selection without accidental placement, and used inventory updates through placement/removal/reload.
 
 ## Architecture
 

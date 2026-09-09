@@ -1,6 +1,6 @@
 import type { Cell, CellPiece, Layout, Piece, Side } from "./types";
 import { isCellPiece } from "./types";
-import { alcoveAt, cellPieces, chebyshev, exteriorCell, connectedPath, inRoom, interiorCell, inWorld, manhattan, sameCell, wallPieces } from "./geometry";
+import { indoorCell, alcoveAt, cellPieces, chebyshev, exteriorCell, connectedPath, inRoom, interiorCell, inWorld, manhattan, sameCell, wallPieces } from "./geometry";
 
 export const FACINGS: readonly Side[] = ["n", "e", "s", "w"];
 export const VECTORS: Record<Side, Cell> = { n: { x: 0, y: -1 }, e: { x: 1, y: 0 }, s: { x: 0, y: 1 }, w: { x: -1, y: 0 } };
@@ -13,7 +13,7 @@ export function isFacing(value: unknown): value is Side {
 }
 
 export function isDirectional(piece: Piece): piece is CellPiece {
-  return isCellPiece(piece) && (piece.kind === "seat" || piece.kind === "shelf" || piece.kind === "gate");
+  return isCellPiece(piece) && (piece.kind === "seat" || piece.kind === "bench" || piece.kind === "shelf" || piece.kind === "gate");
 }
 
 export function setFacing(pieces: Piece[], cell: Cell, direction: Side | "auto"): Piece[] {
@@ -31,7 +31,7 @@ function nextCell(cell: Cell, direction: Side): Cell {
 }
 
 function indoor(layout: Layout, cell: Cell): boolean {
-  return inRoom(layout.room, cell) || Boolean(alcoveAt(layout.room, layout.pieces, cell));
+  return indoorCell(layout, cell);
 }
 
 function glazing(layout: Layout, cell: Cell, direction: Side): boolean {
@@ -41,24 +41,25 @@ function glazing(layout: Layout, cell: Cell, direction: Side): boolean {
 function safeFront(layout: Layout, piece: CellPiece, direction: Side, viewWindow: boolean): boolean {
   const next = nextCell(piece, direction);
   if (!inWorld(layout.world, next)) return false;
-  if (piece.kind !== "gate" && !indoor(layout, next)) return viewWindow && glazing(layout, piece, direction);
-  if (piece.kind === "gate" && indoor(layout, next)) return false;
+  const outdoor = piece.kind === "gate" || piece.kind === "bench" || layout.outdoorFurniture && !indoor(layout, piece);
+  if (!outdoor && !indoor(layout, next)) return viewWindow && glazing(layout, piece, direction);
+  if (outdoor && indoor(layout, next)) return false;
   const obstacle = cellPieces(layout).find((other) => sameCell(other, next));
   if (!obstacle) return true;
   if (piece.kind === "gate") return obstacle.kind === "path";
   if (piece.kind === "shelf") return obstacle.kind === "seat";
-  return obstacle.kind === "seat" || obstacle.kind === "table" || obstacle.kind === "hearth";
+  return obstacle.kind === "seat" || obstacle.kind === "bench" || obstacle.kind === "table" || obstacle.kind === "desk" || obstacle.kind === "hearth";
 }
 
 function clearView(layout: Layout, from: Cell, to: Cell): boolean {
-  const blockers = cellPieces(layout).filter((p) => p.kind === "shelf" || p.kind === "tree");
+  const blockers = cellPieces(layout).filter((p) => p.kind === "shelf" || p.kind === "tree" || p.kind === "hedge");
   const steps = Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y)) * 8;
   for (let i = 1; i < steps; i++) {
     const x = from.x + (to.x - from.x) * i / steps;
     const y = from.y + (to.y - from.y) * i / steps;
     const cell = { x: Math.round(x), y: Math.round(y) };
     if (sameCell(cell, from) || sameCell(cell, to)) continue;
-    if (!indoor(layout, cell) || blockers.some((p) => sameCell(p, cell))) return false;
+    if (indoor(layout, cell) !== indoor(layout, from) || blockers.some((p) => sameCell(p, cell))) return false;
   }
   return true;
 }
@@ -78,7 +79,8 @@ export function automaticFacing(slug: string, layout: Layout, piece: CellPiece):
     ? "Faces the alcove opening, back into the room." : "Faces the alcove opening; furniture currently blocks the space in front.");
   const windowPlace = slug === "window-place" && piece.kind === "seat";
   const safe = FACINGS.filter((side) => safeFront(layout, piece, side, windowPlace));
-  const inward = FACINGS.filter((side) => piece.kind === "gate" ? inWorld(layout.world, nextCell(piece, side)) && !indoor(layout, nextCell(piece, side)) : indoor(layout, nextCell(piece, side)));
+  const outdoor = piece.kind === "gate" || piece.kind === "bench" || layout.outdoorFurniture && !indoor(layout, piece);
+  const inward = FACINGS.filter((side) => inWorld(layout.world, nextCell(piece, side)) && (outdoor ? !indoor(layout, nextCell(piece, side)) : indoor(layout, nextCell(piece, side))));
   const candidates = safe.length ? safe : inward.length ? inward : [...FACINGS];
   const center = { x: layout.room.x + (layout.room.w - 1) / 2, y: layout.room.y + (layout.room.h - 1) / 2 };
   const fallback = rankedDirections(piece, center).find((side) => candidates.includes(side))!;
@@ -102,6 +104,7 @@ export function automaticFacing(slug: string, layout: Layout, piece: CellPiece):
     return result(directions[0] ?? fallback, paths.length ? "Passage lines up with the neighboring path stones." : "Passage points toward the entrance.");
   }
   if (!safe.length) return result(fallback, "No clear front available; uses the inward direction rather than a solid wall.");
+  if (piece.kind === "bench" && layout.street && candidates.includes(layout.street)) return result(layout.street, "Faces the street from this sheltered spot beside the door.");
   if (windowPlace) {
     const side = candidates.find((side) => glazing(layout, piece, side));
     if (side) return result(side, "Faces the glass in this window place.");
@@ -118,12 +121,12 @@ export function automaticFacing(slug: string, layout: Layout, piece: CellPiece):
   }
   const focuses = slug === "sitting-circle"
     ? [...nearby("hearth", 2), ...nearby("table", 2)]
-    : [...nearby("table", 2), ...nearby("hearth", 2)];
+    : [...nearby("desk", 1), ...nearby("table", 2), ...nearby("hearth", 2)];
   for (const focus of focuses) {
     const direction = toward(focus);
     if (direction && clearView(layout, piece, focus)) return result(direction, `Faces the nearby ${focus.kind}.`);
   }
-  for (const seat of nearby("seat", 2)) {
+  for (const seat of [...nearby("seat", 2), ...nearby("bench", 2)]) {
     const direction = toward(seat);
     if (direction && clearView(layout, piece, seat)) return result(direction, "Faces nearby seating for conversation.");
   }
